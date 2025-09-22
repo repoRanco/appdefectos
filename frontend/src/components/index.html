@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RancoQC - Análisis de Cerezas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <span class="time" id="current-time">07:00</span>
+            </div>
+            <div class="header-center">
+                <div class="logo">
+                    <i class="fas fa-cherry"></i>
+                    <span>RancoQC</span>
+                </div>
+                <div class="user-name">Mary Ocaris</div>
+            </div>
+            <div class="header-right">
+                <i class="fas fa-wifi"></i>
+                <i class="fas fa-signal"></i>
+                <div class="ranco-logo">
+                    <img src="/public/LogoColor.ddc5d2c8.png" alt="Ranco Logo" class="logo-img">
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Formulario de entrada -->
+            <div class="form-section" id="form-section">
+                <h2>QC Recepción T25</h2>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>DISTRIBUCIÓN</label>
+                        <select id="distribucion">
+                            <option value="">Seleccionar...</option>
+                            <option value="roja">Roja</option>
+                            <option value="bicolor">Bicolor</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>GUÍA SII</label>
+                        <input type="text" id="guia-sii" placeholder="Ingrese guía SII">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>LOTE</label>
+                        <input type="text" id="lote" placeholder="Ingrese lote">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>N° FRUTOS</label>
+                        <input type="number" id="num-frutos" placeholder="Cantidad de frutos">
+                    </div>
+                </div>
+
+                <!-- Captura de imagen -->
+                <div class="capture-section">
+                    <div class="capture-area" id="capture-area">
+                        <div class="camera-preview" id="camera-preview">
+                            <i class="fas fa-camera camera-icon"></i>
+                            <p>Selecciona una imagen para analizar</p>
+                        </div>
+                        <div class="grid-overlay" id="grid-overlay"></div>
+                    </div>
+                    
+                    <!-- Opciones de captura -->
+                    <div class="upload-options">
+                        <label class="btn btn-secondary upload-btn">
+                            <i class="fas fa-folder-open"></i> Subir desde archivos
+                            <input type="file" id="file-input" accept="image/*" style="display:none;">
+                        </label>
+
+                        <label class="btn btn-primary upload-btn">
+                            <i class="fas fa-camera"></i> Capturar con cámara
+                            <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;">
+                        </label>
+                    </div>
+                    
+                    <div class="capture-controls">
+                        <button class="btn btn-secondary" onclick="goBack()">
+                            <i class="fas fa-arrow-left"></i> Anterior
+                        </button>
+                        <button class="btn btn-primary" id="analyze-btn" onclick="analyzeImage()" disabled>
+                            <i class="fas fa-search"></i> Analizar imagen
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección de resultados -->
+            <div class="results-section" id="results-section" style="display: none;">
+                <h2>Resultados del Análisis</h2>
+                
+                <div class="analysis-info">
+                    <div class="info-item">
+                        <span class="label">Total de cerezas:</span>
+                        <span class="value" id="total-cherries">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Fecha y hora:</span>
+                        <span class="value" id="analysis-timestamp">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Zonas analizadas:</span>
+                        <span class="value" id="zones-analyzed">0</span>
+                    </div>
+                </div>
+
+                <div class="defects-list" id="defects-list">
+                    <!-- Los resultados se llenan dinámicamente -->
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-edit" onclick="editResults()">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-upload" onclick="uploadData()">
+                        <i class="fas fa-cloud-upload-alt"></i> Subir
+                    </button>
+                    <button class="btn btn-add" onclick="addDefect()">
+                        <i class="fas fa-plus"></i> Agregar
+                    </button>
+                    <button class="btn btn-save" onclick="saveData()">
+                        <i class="fas fa-save"></i> Guardar
+                    </button>
+                    <button class="btn btn-delete" onclick="deleteData()">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                </div>
+
+                <div class="navigation-buttons">
+                    <button class="btn btn-secondary" onclick="newAnalysis()">
+                        <i class="fas fa-plus-circle"></i> Nuevo análisis
+                    </button>
+                    <button class="btn btn-secondary" onclick="goToHistory()">
+                        <i class="fas fa-history"></i> Historial
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading spinner -->
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analizando imagen...</p>
+                <div class="loading-details">
+                    <small id="loading-status">Procesando con modelo YOLO...</small>
+                </div>
+            </div>
+
+            <!-- Success message -->
+            <div class="success-message" id="success-message" style="display: none;">
+                <i class="fas fa-check-circle"></i>
+                <h3>Información agregada con éxito</h3>
+                <p>Los datos han sido procesados correctamente</p>
+            </div>
+        </main>
+
+        <!-- Footer Navigation -->
+        <footer class="app-footer">
+            <button class="footer-btn active" onclick="goHome()">
+                <i class="fas fa-home"></i>
+                <span>Inicio</span>
+            </button>
+            <button class="footer-btn" onclick="newAnalysis()">
+                <i class="fas fa-plus-circle"></i>
+                <span>Nuevo análisis</span>
+            </button>
+            <button class="footer-btn" onclick="goToHistory()">
+                <i class="fas fa-history"></i>
+                <span>Historial</span>
+            </button>
+        </footer>
+    </div>
+
+    <!-- Modal para agregar defectos -->
+    <div class="modal" id="add-defect-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Agregar Defecto</h3>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Tipo de defecto:</label>
+                    <select id="defect-type">
+                        <option value="">Seleccionar...</option>
+                        <!-- Se llenan dinámicamente desde el backend -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Cantidad:</label>
+                    <input type="number" id="defect-count" min="1" value="1">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmAddDefect()">Agregar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación -->
+    <div class="modal" id="confirm-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="confirm-title">Confirmar acción</h3>
+                <button class="close-btn" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message">¿Está seguro de realizar esta acción?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancelar</button>
+                <button class="btn btn-primary" id="confirm-action-btn" onclick="confirmAction()">Confirmar</button>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

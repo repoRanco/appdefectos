@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RancoQC - Análisis de Cerezas</title>
+    <link rel="stylesheet" href="../styles/analysis.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="analysis-container">
+        <!-- Header -->
+        <header class="analysis-header">
+            <div class="header-left">
+                <div class="ranco-logo">
+                    <img src="/public/LogoColor.ddc5d2c8.png" alt="Ranco Logo" class="logo-img">
+                </div>
+            </div>
+            <span class="time" id="current-time">07:00</span>
+            <div class="header-center">
+                <div class="logo">
+                    <i class="fas fa-cherry"></i>
+                    <span>RancoQC</span>
+                </div>
+                <div class="user-info">
+                    <div class="user-name" id="user-name">Mary Ocaris</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <i class="fas fa-wifi"></i>
+                <i class="fas fa-signal"></i>
+                <button class="logout-btn" onclick="logout()" title="Cerrar Sesión">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="analysis-main">
+            <!-- Module Title -->
+            <div class="module-header">
+                <h1 id="module-title">QC Recepción T25</h1>
+                <div class="module-subtitle">DISTRIBUCIÓN</div>
+            </div>
+
+            <!-- Form Section -->
+            <div class="form-section" id="form-section">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>PERFIL DE ANÁLISIS</label>
+                        <select id="profile-select" required onchange="onProfileChange()">
+                            <option value="">Seleccionar perfil...</option>
+                            <option value="qc_recepcion">QC Recepción</option>
+                            <option value="packing_qc">Packing QC</option>
+                            <option value="contramuestra">Contramuestra</option>
+                        </select>
+                        <small class="form-help">Selecciona el perfil de análisis que determinará las zonas específicas</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>DISTRIBUCIÓN</label>
+                        <select id="distribucion" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="roja">Roja</option>
+                            <option value="bicolor">Bicolor</option>
+                        </select>
+                        <small class="form-help">Se debe seleccionar entre fruta Roja y Bicolor. Tendrán distinta distribución en la bandeja</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>GUÍA SII</label>
+                        <input type="text" id="guia-sii" placeholder="Ingrese guía SII" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>LOTE</label>
+                        <input type="text" id="lote" placeholder="Ingrese lote" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>N° FRUTOS</label>
+                        <input type="number" id="num-frutos" placeholder="Cantidad de frutos" min="1" required>
+                    </div>
+
+                    <!-- Campos adicionales para Packing QC -->
+                    <div class="form-group packing-only" style="display: none;">
+                        <label>N° PROCESO</label>
+                        <input type="text" id="num-proceso" placeholder="Número de proceso">
+                    </div>
+
+                    <div class="form-group packing-only" style="display: none;">
+                        <label>ID DE CAJA</label>
+                        <input type="text" id="id-caja" placeholder="ID de caja">
+                    </div>
+                </div>
+
+                <!-- Capture Section -->
+                <div class="capture-section">
+                    <div class="capture-instructions">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Haz click para capturar la imagen</span>
+                    </div>
+
+                    <div class="capture-area" id="capture-area">
+                        <div class="camera-preview" id="camera-preview">
+                            <i class="fas fa-camera camera-icon"></i>
+                            <p>La cámara mostrará una cuadrícula de encuadre que permita ajustar adecuadamente los frutos para la captura.</p>
+                            <p class="capture-hint">Cuando la imagen esté fuera del encuadre se verá en rojo y en blanco cuando esté bien posicionada</p>
+                        </div>
+                        <div class="grid-overlay" id="grid-overlay"></div>
+                        <div class="image-preview-container" id="image-preview-container" style="display: none;">
+                            <img id="image-preview" class="image-preview" alt="Vista previa">
+                            <div class="image-info" id="image-info"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Upload Options -->
+                    <div class="upload-options">
+                        <label class="btn btn-secondary upload-btn">
+                            <i class="fas fa-folder-open"></i> Subir desde archivos
+                            <input type="file" id="file-input" accept="image/*" style="display:none;">
+                        </label>
+
+                        <button class="btn btn-primary upload-btn" onclick="openLiveCamera()">
+                            <i class="fas fa-video"></i> Cámara en vivo
+                        </button>
+
+                        <label class="btn btn-success upload-btn">
+                            <i class="fas fa-camera"></i> Capturar con cámara
+                            <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;">
+                        </label>
+
+                        <!-- RTSP Input and Analyze button -->
+                        <div class="rtsp-input-group" style="display:flex; gap:8px; align-items:center; width:100%; margin-top:8px;">
+                            <input id="rtsp-url" type="text" placeholder="rtsp://usuario:password@ip:puerto/ruta" value="rtsp://172.31.30.136:8554/cam1" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd;">
+                            <button class="btn btn-primary" onclick="analyzeFromRTSP()">
+                                <i class="fas fa-plug"></i> Analizar desde cámara (RTSP)
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="capture-controls">
+                        <button class="btn btn-secondary" onclick="goBack()">
+                            <i class="fas fa-arrow-left"></i> Anterior
+                        </button>
+                        <button class="btn btn-primary" id="analyze-btn" onclick="analyzeImage()" disabled>
+                            <i class="fas fa-search"></i> Analizar imagen
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="results-section" id="results-section" style="display: none;">
+                <div class="results-header">
+                    <h2>Resultados del Análisis</h2>
+                    <div class="results-info">
+                        <div class="info-item">
+                            <span class="label">Total de cerezas:</span>
+                            <span class="value" id="total-cherries">0</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Fecha y hora:</span>
+                            <span class="value" id="analysis-timestamp">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Zonas analizadas:</span>
+                            <span class="value" id="zones-analyzed">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analyzed Image -->
+                <div class="analyzed-image-container" id="analyzed-image-container" style="display: none;">
+                    <h3><i class="fas fa-image"></i> Imagen Analizada</h3>
+                    <div class="image-analysis-info">
+                        <span><i class="fas fa-crosshairs"></i> Detecciones marcadas</span>
+                        <span><i class="fas fa-layer-group"></i> Zonas delimitadas</span>
+                        <span><i class="fas fa-percentage"></i> Confianza: 80%</span>
+                    </div>
+                    <div class="analyzed-image-wrapper">
+                        <img id="analyzed-image" class="analyzed-image" alt="Imagen analizada">
+                    </div>
+                </div>
+
+                <!-- Defects List -->
+                <div class="defects-container">
+                    <h3><i class="fas fa-list-ul"></i> Defectos Detectados</h3>
+                    <div class="defects-list" id="defects-list">
+                        <!-- Los resultados se llenan dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="btn btn-edit" onclick="editResults()">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-upload" onclick="uploadData()">
+                        <i class="fas fa-cloud-upload-alt"></i> Subir
+                    </button>
+                    <button class="btn btn-add" onclick="addDefect()">
+                        <i class="fas fa-plus"></i> Agregar
+                    </button>
+                    <button class="btn btn-save" onclick="saveData()">
+                        <i class="fas fa-save"></i> Guardar
+                    </button>
+                    <button class="btn btn-delete" onclick="deleteData()">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                </div>
+
+                <!-- Navigation Buttons -->
+                <div class="navigation-buttons">
+                    <button class="btn btn-secondary" onclick="newAnalysis()">
+                        <i class="fas fa-plus-circle"></i> Nuevo análisis
+                    </button>
+                    <button class="btn btn-secondary" onclick="goToHistory()">
+                        <i class="fas fa-history"></i> Historial
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analizando imagen...</p>
+                <div class="loading-details">
+                    <small id="loading-status">Procesando con modelo YOLO...</small>
+                </div>
+            </div>
+
+            <!-- Success Message -->
+            <div class="success-message" id="success-message" style="display: none;">
+                <i class="fas fa-check-circle"></i>
+                <h3>Información agregada con éxito</h3>
+                <p>Los datos han sido procesados correctamente</p>
+                <div class="success-actions">
+                    <button class="btn btn-primary" onclick="goToHistory()">
+                        <i class="fas fa-history"></i> Ver Historial
+                    </button>
+                    <button class="btn btn-secondary" onclick="newAnalysis()">
+                        <i class="fas fa-plus-circle"></i> Nuevo Análisis
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer Navigation -->
+        <footer class="analysis-footer">
+            <button class="footer-btn" onclick="goHome()">
+                <i class="fas fa-home"></i>
+                <span>Inicio</span>
+            </button>
+            <button class="footer-btn active" onclick="newAnalysis()">
+                <i class="fas fa-plus-circle"></i>
+                <span>Nuevo</span>
+            </button>
+            <button class="footer-btn" onclick="goToHistory()">
+                <i class="fas fa-history"></i>
+                <span>Historial</span>
+            </button>
+            <button class="footer-btn" onclick="showSettings()">
+                <i class="fas fa-cog"></i>
+                <span>Config</span>
+            </button>
+        </footer>
+    </div>
+
+    <!-- Modal para agregar defectos -->
+    <div class="modal" id="add-defect-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Agregar Defecto</h3>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Tipo de defecto:</label>
+                    <select id="defect-type">
+                        <option value="">Seleccionar...</option>
+                        <option value="machucón">Machucón</option>
+                        <option value="pudrición húmeda">Pudrición húmeda</option>
+                        <option value="picada de pájaro">Picada de pájaro</option>
+                        <option value="h.c estrella">H.C Estrella</option>
+                        <option value="piel de lagarto">Piel de lagarto</option>
+                        <option value="fruto deshidratado">Fruto deshidratado</option>
+                        <option value="presencia de suzukii">Presencia de Suzukii</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Cantidad:</label>
+                    <input type="number" id="defect-count" min="1" value="1">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmAddDefect()">Agregar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación -->
+    <div class="modal" id="confirm-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="confirm-title">Confirmar acción</h3>
+                <button class="close-btn" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message">¿Está seguro de realizar esta acción?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancelar</button>
+                <button class="btn btn-primary" id="confirm-action-btn" onclick="confirmAction()">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de cámara en vivo -->
+    <div class="modal" id="camera-modal" style="display: none;">
+        <div class="modal-content camera-modal-content">
+            <div class="modal-header">
+                <h3>Cámara en Vivo</h3>
+                <button class="close-btn" onclick="closeLiveCamera()">&times;</button>
+            </div>
+            <div class="modal-body camera-modal-body">
+                <div class="camera-container">
+                    <video id="live-camera" autoplay playsinline></video>
+                    <canvas id="camera-canvas" style="display: none;"></canvas>
+                    <div class="camera-grid-overlay"></div>
+                    <div class="camera-status" id="camera-status">
+                        <i class="fas fa-circle"></i>
+                        <span>Cámara activa</span>
+                    </div>
+                </div>
+                <div class="camera-info">
+                    <p><i class="fas fa-info-circle"></i> Posiciona los frutos dentro de la cuadrícula para una mejor captura</p>
+                    <div class="camera-devices" id="camera-devices" style="display: none;">
+                        <label>Seleccionar cámara:</label>
+                        <select id="camera-select"></select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="switchCamera()" id="switch-camera-btn" style="display: none;">
+                    <i class="fas fa-sync-alt"></i> Cambiar cámara
+                </button>
+                <button class="btn btn-secondary" onclick="closeLiveCamera()">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="btn btn-primary" onclick="captureFromLiveCamera()">
+                    <i class="fas fa-camera"></i> Capturar foto
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/analysis.js"></script>
+</body>
+</html>

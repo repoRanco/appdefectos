@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RancoQC - Dashboard</title>
+    <link rel="stylesheet" href="../styles/dashboard.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-left">
+                <div class="ranco-logo">
+                    <img src="/public/LogoColor.ddc5d2c8.png" alt="Ranco Logo" class="logo-img">
+                </div>
+                <span class="time" id="current-time">07:00</span>
+            </div>
+            <div class="header-center">
+                <div class="logo">
+                    <i class="fas fa-cherry"></i>
+                    <span>RancoQC</span>
+                </div>
+                <div class="user-info">
+                    <div class="user-name" id="user-name">Mary Ocaris</div>
+                    <div class="user-facility" id="user-facility">FacilitieTemporada</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <i class="fas fa-wifi"></i>
+                <i class="fas fa-signal"></i>
+                <button class="logout-btn" onclick="logout()" title="Cerrar Sesión">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="dashboard-main">
+            <div class="welcome-section">
+                <h1>Contra Muestras QC</h1>
+                <div class="current-module" id="current-module">
+                    <span class="module-label">Módulo</span>
+                    <span class="module-name">Packing QC</span>
+                </div>
+            </div>
+
+            <!-- Module Selection -->
+            <div class="modules-section">
+                <h2>Seleccionar Módulo</h2>
+                <div class="modules-grid">
+                    <div class="module-card" onclick="selectModule('qc-recepcion')">
+                        <div class="module-icon">
+                            <i class="fas fa-clipboard-check"></i>
+                        </div>
+                        <div class="module-info">
+                            <h3>QC Recepción</h3>
+                            <p>Control de calidad en recepción de fruta</p>
+                            <div class="module-status active">Disponible</div>
+                        </div>
+                        <div class="module-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+
+                    <div class="module-card" onclick="selectModule('packing-qc')">
+                        <div class="module-icon">
+                            <i class="fas fa-box"></i>
+                        </div>
+                        <div class="module-info">
+                            <h3>Packing QC</h3>
+                            <p>Control de calidad en empaque</p>
+                            <div class="module-status active">Disponible</div>
+                        </div>
+                        <div class="module-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+
+                    <div class="module-card" onclick="selectModule('contramuestras')">
+                        <div class="module-icon">
+                            <i class="fas fa-vials"></i>
+                        </div>
+                        <div class="module-info">
+                            <h3>Contramuestras</h3>
+                            <p>Análisis de contramuestras</p>
+                            <div class="module-status active">Disponible</div>
+                        </div>
+                        <div class="module-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="actions-section">
+                <h2>Acciones Rápidas</h2>
+                <div class="actions-grid">
+                    <button class="action-btn" onclick="goToHistory()">
+                        <i class="fas fa-history"></i>
+                        <span>Historial</span>
+                        <small>Ver capturas realizadas</small>
+                    </button>
+
+                    <button class="action-btn" onclick="newAnalysis()" id="new-analysis-btn">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Nuevo Análisis</span>
+                        <small>Iniciar nueva captura</small>
+                    </button>
+
+                    <button class="action-btn admin-only" onclick="createUser()" id="create-user-btn" style="display: none;">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Crear Usuario</span>
+                        <small>Solo administradores</small>
+                    </button>
+
+                    <button class="action-btn" onclick="viewReports()">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Reportes</span>
+                        <small>Estadísticas y reportes</small>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="activity-section">
+                <h2>Actividad Reciente</h2>
+                <div class="activity-list" id="activity-list">
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <div class="activity-info">
+                            <div class="activity-title">Análisis completado</div>
+                            <div class="activity-details">Lote: 1131R000848 - 25 cerezas detectadas</div>
+                            <div class="activity-time">Hace 2 horas</div>
+                        </div>
+                        <div class="activity-status success">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-upload"></i>
+                        </div>
+                        <div class="activity-info">
+                            <div class="activity-title">Datos subidos a SDT</div>
+                            <div class="activity-details">Guía SII: 455R000851</div>
+                            <div class="activity-time">Hace 4 horas</div>
+                        </div>
+                        <div class="activity-status success">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-save"></i>
+                        </div>
+                        <div class="activity-info">
+                            <div class="activity-title">Análisis guardado</div>
+                            <div class="activity-details">Pendiente de subir - Lote: 371</div>
+                            <div class="activity-time">Ayer</div>
+                        </div>
+                        <div class="activity-status pending">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer Navigation -->
+        <footer class="dashboard-footer">
+            <button class="footer-btn active" onclick="goHome()">
+                <i class="fas fa-home"></i>
+                <span>Inicio</span>
+            </button>
+            <button class="footer-btn" onclick="newAnalysis()">
+                <i class="fas fa-plus-circle"></i>
+                <span>Nuevo</span>
+            </button>
+            <button class="footer-btn" onclick="goToHistory()">
+                <i class="fas fa-history"></i>
+                <span>Historial</span>
+            </button>
+            <button class="footer-btn" onclick="showSettings()">
+                <i class="fas fa-cog"></i>
+                <span>Config</span>
+            </button>
+        </footer>
+    </div>
+
+    <!-- Module Selection Modal -->
+    <div class="modal" id="module-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Seleccionar Tipo de Análisis</h3>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="analysis-types">
+                    <div class="analysis-type" onclick="startAnalysis('qc-recepcion')">
+                        <div class="type-icon">
+                            <i class="fas fa-clipboard-check"></i>
+                        </div>
+                        <div class="type-info">
+                            <h4>QC Recepción T25</h4>
+                            <p>Control de calidad en recepción</p>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-type" onclick="startAnalysis('packing-qc')">
+                        <div class="type-icon">
+                            <i class="fas fa-box"></i>
+                        </div>
+                        <div class="type-info">
+                            <h4>Packing QC T25</h4>
+                            <p>Control de calidad en empaque</p>
+                        </div>
+                    </div>
+
+                    <div class="analysis-type" onclick="startAnalysis('contramuestra')">
+                        <div class="type-icon">
+                            <i class="fas fa-vials"></i>
+                        </div>
+                        <div class="type-info">
+                            <h4>Contramuestra T25</h4>
+                            <p>Análisis de contramuestras</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Message -->
+    <div class="success-message" id="success-message" style="display: none;">
+        <div class="success-content">
+            <i class="fas fa-check-circle"></i>
+            <h3>¡Bienvenido a RancoQC!</h3>
+            <p>Sistema iniciado correctamente</p>
+        </div>
+    </div>
+
+    <script src="../js/dashboard.js"></script>
+</body>
+</html>
