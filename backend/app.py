@@ -700,6 +700,342 @@ def update_confidence():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
+@app.route('/capture_local_camera', methods=['POST'])
+def capture_local_camera():
+    """Endpoint para capturar foto desde cámara local y analizarla inmediatamente"""
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        
+        # Obtener perfil y distribución del request
+        profile = data.get('profile', 'qc_recepcion')
+        distribucion = data.get('distribucion', 'roja')
+        camera_type = data.get('camera_type', 'usb')  # 'usb' o 'raspberry'
+        camera_index = int(data.get('camera_index', 0))  # Índice de cámara (0 = predeterminada)
+        
+        # Cargar zonas dinámicamente según perfil y distribución
+        zones = load_zones(profile, distribucion)
+        if not zones:
+            return jsonify({"success": False, "error": "No se pudieron cargar las zonas"})
+
+        print(f"📷 Capturando desde cámara {camera_type} índice: {camera_index}")
+        
+        frame = None
+        
+        # Intentar captura con Raspberry Pi Camera Module primero
+        if camera_type == 'raspberry':
+            try:
+                print("🍓 Intentando captura con Raspberry Pi Camera Module...")
+                
+                # Método 1: Usar libcamera-still (Raspberry Pi OS Bullseye+)
+                import subprocess
+                import tempfile
+                
+                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
+                    temp_path = temp_file.name
+                
+                # Comando libcamera-still para Raspberry Pi Camera Module
+                cmd = [
+                    'libcamera-still',
+                    '-o', temp_path,
+                    '--width', '1920',
+                    '--height', '1080',
+                    '--timeout', '2000',  # 2 segundos timeout
+                    '--nopreview',
+                    '--immediate'
+                ]
+                
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0:
+                        # Leer imagen capturada
+                        frame = cv2.imread(temp_path)
+                        if frame is not None:
+                            print("✅ Captura exitosa con libcamera-still")
+                        os.unlink(temp_path)  # Eliminar archivo temporal
+                    else:
+                        print(f"⚠️ libcamera-still falló: {result.stderr}")
+                except subprocess.TimeoutExpired:
+                    print("⚠️ Timeout en libcamera-still")
+                except FileNotFoundError:
+                    print("⚠️ libcamera-still no encontrado")
+                
+                # Método 2: Intentar con raspistill (Raspberry Pi OS Legacy)
+                if frame is None:
+                    print("🔄 Intentando con raspistill...")
+                    cmd = [
+                        'raspistill',
+                        '-o', temp_path,
+                        '-w', '1920',
+                        '-h', '1080',
+                        '-t', '2000',  # 2 segundos timeout
+                        '-n',  # No preview
+                        '--immediate'
+                    ]
+                    
+                    try:
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                        if result.returncode == 0:
+                            frame = cv2.imread(temp_path)
+                            if frame is not None:
+                                print("✅ Captura exitosa con raspistill")
+                            os.unlink(temp_path)
+                        else:
+                            print(f"⚠️ raspistill falló: {result.stderr}")
+                    except subprocess.TimeoutExpired:
+                        print("⚠️ Timeout en raspistill")
+                    except FileNotFoundError:
+                        print("⚠️ raspistill no encontrado")
+                
+            except Exception as e:
+                print(f"⚠️ Error en captura Raspberry Pi: {e}")
+        
+        # Si no se pudo capturar con Raspberry Pi o es cámara USB, usar OpenCV
+        if frame is None:
+            print("🔄 Intentando captura con OpenCV...")
+            
+            # Intentar abrir cámara local con OpenCV
+            cap = cv2.VideoCapture(camera_index)
+            
+            if not cap.isOpened():
+                # Intentar con diferentes índices si el especificado falla
+                for i in range(3):  # Probar índices 0, 1, 2
+                    cap = cv2.VideoCapture(i)
+                    if cap.isOpened():
+                        camera_index = i
+                        print(f"✅ Cámara OpenCV encontrada en índice: {i}")
+                        break
+                else:
+                    return jsonify({
+                        "success": False,
+                        "error": "No se pudo acceder a ninguna cámara",
+                        "suggestions": [
+                            "Para Raspberry Pi: Verifica que la cámara esté habilitada con 'sudo raspi-config'",
+                            "Para Raspberry Pi: Instala libcamera-tools: 'sudo apt install libcamera-apps'",
+                            "Para USB: Verifica que la cámara esté conectada",
+                            "Asegúrate de que no esté siendo usada por otra aplicación"
+                        ]
+                    })
+            
+            # Configurar resolución de cámara
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+            
+            # Capturar frame
+            ret, frame = cap.read()
+            cap.release()
+            
+            if not ret or frame is None:
+                return jsonify({
+                    "success": False,
+                    "error": "No se pudo capturar imagen de la cámara",
+                    "suggestions": [
+                        "Verifica que la cámara esté funcionando correctamente",
+                        "Para Raspberry Pi: Prueba 'libcamera-hello' para verificar la cámara",
+                        "Prueba cerrar otras aplicaciones que puedan estar usando la cámara"
+                    ]
+                })
+            
+            print("✅ Captura exitosa con OpenCV")
+        
+        print(f"📐 Imagen capturada: {frame.shape[1]}x{frame.shape[0]}")
+        
+        # Procesar imagen igual que en analyze_cherries
+        confidence = 0.8
+        results = model.predict(frame, conf=confidence, verbose=False)
+        
+        zone_counts = {name: 0 for name in zones.keys()}
+        total_detections = 0
+        detections_by_zone = {}
+        
+        # Obtener dimensiones de la imagen
+        img_height, img_width = frame.shape[:2]
+        img_size = (img_width, img_height)
+        zones_reference_size = (1920, 1080)
+        
+        # Escalar zonas para el dibujo
+        scaled_zones_for_drawing = scale_zones_to_image(zones, zones_reference_size, img_size)
+ 
+        if len(results[0].boxes) > 0:
+            # Filtrar detecciones duplicadas
+            filtered_boxes = remove_duplicate_detections(results[0].boxes, min_distance=50)
+            print(f"🔄 Detecciones después de filtrar duplicados: {len(filtered_boxes)}")
+            
+            for i, box in enumerate(filtered_boxes):
+                try:
+                    bbox = box.xyxy[0].tolist()
+                    conf_score = float(box.conf[0])
+                    
+                    if conf_score < confidence:
+                        continue
+                    
+                    # Determinar zona usando escalado apropiado
+                    zone_name = assign_zone(bbox, zones, img_size, zones_reference_size)
+                    if zone_name == "Sin clasificar":
+                        continue
+                    
+                    zone_counts[zone_name] += 1
+                    if zone_name not in detections_by_zone:
+                        detections_by_zone[zone_name] = []
+                    detections_by_zone[zone_name].append({
+                        "bbox": bbox,
+                        "conf": conf_score
+                    })
+                    total_detections += 1
+                
+                except Exception as e:
+                    print(f"❌ Error procesando detección {i}: {e}")
+                    continue
+            
+            # Usar las detecciones filtradas para el dibujo
+            results[0].boxes = filtered_boxes
+        
+        # Dibujar zonas y detecciones
+        processed_img = draw_zones_and_detections(
+            frame.copy(),
+            results[0].boxes,
+            scaled_zones_for_drawing,
+            confidence_threshold=confidence
+        )
+        
+        # Guardar imagen procesada
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        processed_filename = f"analysis_{timestamp}_local_camera_conf80.jpg"
+        processed_path = os.path.join("static", processed_filename)
+        cv2.imwrite(processed_path, processed_img)
+        
+        # Filtrar solo zonas con detecciones > 0
+        filtered_results = {k: v for k, v in zone_counts.items() if v > 0}
+        
+        print(f"📊 Resultados por zona: {filtered_results}")
+        print(f"📁 Imagen procesada guardada: {processed_path}")
+        
+        return jsonify({
+            "success": True,
+            "results": filtered_results,
+            "total_cherries": total_detections,
+            "confidence_used": confidence,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "zones_loaded": len(zones),
+            "processed_image": f"/static/{processed_filename}",
+            "detections_by_zone": detections_by_zone,
+            "image_size": f"{img_width}x{img_height}",
+            "zones_available": list(zones.keys()),
+            "camera_used": camera_index
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en captura de cámara local: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/test_rtsp', methods=['POST'])
+def test_rtsp():
+    """Endpoint para probar conectividad RTSP sin análisis"""
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        rtsp_url = data.get('rtsp_url', '').strip()
+        if not rtsp_url:
+            return jsonify({"success": False, "error": "Falta 'rtsp_url' en el payload"}), 400
+
+        print(f"🔍 Probando conectividad RTSP: {rtsp_url}")
+        
+        # Configurar opciones más agresivas para test
+        ffmpeg_options = [
+            "rtsp_transport;tcp",
+            "stimeout;5000000",            # 5 segundos timeout para test
+            "max_delay;100000",            # Buffer mínimo
+            "buffer_size;16384",           # Buffer muy pequeño
+            "analyzeduration;500000",      # 0.5 segundos análisis
+            "probesize;16384",             # Probe size mínimo
+            "fflags;nobuffer"
+        ]
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "|".join(ffmpeg_options)
+        
+        # Intentar conexión rápida
+        cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+        
+        if not cap.isOpened():
+            return jsonify({
+                "success": False,
+                "error": "No se pudo conectar al stream RTSP",
+                "diagnostics": {
+                    "url": rtsp_url,
+                    "connection": "failed",
+                    "suggestions": [
+                        "Verifica que la URL sea correcta",
+                        "Confirma que el puerto 8554 esté abierto",
+                        "Prueba la URL en VLC primero",
+                        "Verifica que la cámara esté transmitiendo"
+                    ]
+                }
+            })
+        
+        # Intentar leer un frame
+        start_time = time.time()
+        frame_captured = False
+        frame_info = {}
+        
+        for i in range(10):  # Máximo 10 intentos
+            ret, frame = cap.read()
+            if ret and frame is not None:
+                frame_captured = True
+                h, w = frame.shape[:2]
+                frame_info = {
+                    "width": w,
+                    "height": h,
+                    "channels": frame.shape[2] if len(frame.shape) > 2 else 1,
+                    "size_mb": (frame.nbytes / 1024 / 1024)
+                }
+                break
+            time.sleep(0.1)
+        
+        cap.release()
+        connection_time = time.time() - start_time
+        
+        if frame_captured:
+            return jsonify({
+                "success": True,
+                "message": "Conexión RTSP exitosa",
+                "diagnostics": {
+                    "url": rtsp_url,
+                    "connection": "success",
+                    "connection_time": f"{connection_time:.2f}s",
+                    "frame_info": frame_info,
+                    "status": "ready_for_analysis"
+                }
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Conexión establecida pero no se pudo capturar frame",
+                "diagnostics": {
+                    "url": rtsp_url,
+                    "connection": "partial",
+                    "connection_time": f"{connection_time:.2f}s",
+                    "suggestions": [
+                        "La cámara puede estar configurada pero no transmitiendo",
+                        "Verifica el codec de video (H.264 recomendado)",
+                        "Prueba reducir la resolución de la cámara"
+                    ]
+                }
+            })
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Error en test RTSP: {str(e)}",
+            "diagnostics": {
+                "url": rtsp_url if 'rtsp_url' in locals() else "unknown",
+                "connection": "error",
+                "suggestions": [
+                    "Verifica la conectividad de red",
+                    "Confirma que el servidor RTSP esté ejecutándose",
+                    "Prueba con una herramienta externa como VLC"
+                ]
+            }
+        })
+
 @app.route('/analyze_rtsp', methods=['POST'])
 def analyze_rtsp():
     try:
@@ -722,22 +1058,96 @@ def analyze_rtsp():
         warmup_frames = int(data.get('warmup_frames', 8))
         retries = int(data.get('retries', 2))
         use_gstreamer = bool(data.get('use_gstreamer', False))
+        
+        # Parámetros para manejar cámaras de alta resolución
+        max_resolution = data.get('max_resolution', '1920x1080')  # Resolución máxima deseada
+        auto_resize = data.get('auto_resize', True)  # Auto-redimensionar para cámaras de alta resolución
 
-        # Forzar transporte TCP y timeouts internos de FFmpeg (microsegundos)
-        # stimeout: timeout de socket, max_delay: jitter buffer, buffer_size: tamaño de buffer
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;20000000|max_delay;500000|buffer_size;102400"
+        # Configurar opciones de FFmpeg para RTSP con manejo robusto de errores H.264
+        # Opciones específicas para manejar corrupción de stream y errores de decodificación
+        ffmpeg_options = [
+            "rtsp_transport;tcp",           # Forzar TCP para evitar pérdida de paquetes UDP
+            "stimeout;15000000",           # 15 segundos timeout (aumentado para streams problemáticos)
+            "max_delay;1000000",           # 1 segundo jitter buffer (aumentado)
+            "buffer_size;65536",           # Buffer más grande para manejar variaciones
+            "analyzeduration;2000000",     # 2 segundos análisis (más tiempo para streams corruptos)
+            "probesize;65536",             # Probe size más grande
+            "fflags;nobuffer+discardcorrupt", # Sin buffering + descartar frames corruptos
+            "flags;low_delay",             # Baja latencia
+            "err_detect;ignore_err",       # Ignorar errores menores de decodificación
+            "skip_frame;nokey"             # Saltar frames no-key si hay problemas
+        ]
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "|".join(ffmpeg_options)
 
         last_error = None
         img = None
 
+        # Configuraciones progresivamente más tolerantes para streams problemáticos
+        rtsp_configs = [
+            {
+                "name": "Configuración Estándar",
+                "options": [
+                    "rtsp_transport;tcp",
+                    "stimeout;15000000",
+                    "max_delay;1000000",
+                    "buffer_size;65536",
+                    "analyzeduration;2000000",
+                    "probesize;65536",
+                    "fflags;nobuffer+discardcorrupt",
+                    "flags;low_delay",
+                    "err_detect;ignore_err"
+                ]
+            },
+            {
+                "name": "Configuración Tolerante",
+                "options": [
+                    "rtsp_transport;tcp",
+                    "stimeout;20000000",
+                    "max_delay;2000000",
+                    "buffer_size;131072",
+                    "analyzeduration;3000000",
+                    "probesize;131072",
+                    "fflags;nobuffer+discardcorrupt+genpts",
+                    "flags;low_delay",
+                    "err_detect;ignore_err+crccheck",
+                    "skip_frame;nokey"
+                ]
+            },
+            {
+                "name": "Configuración Robusta",
+                "options": [
+                    "rtsp_transport;tcp",
+                    "stimeout;30000000",
+                    "max_delay;5000000",
+                    "buffer_size;262144",
+                    "analyzeduration;5000000",
+                    "probesize;262144",
+                    "fflags;nobuffer+discardcorrupt+genpts+igndts",
+                    "flags;low_delay+global_header",
+                    "err_detect;ignore_err+crccheck+bitstream",
+                    "skip_frame;nokey",
+                    "thread_type;frame"
+                ]
+            }
+        ]
+
         for attempt in range(retries + 1):
             print(f"📡 Intento {attempt+1}/{retries+1} conectando RTSP: {rtsp_url}")
+            
+            # Usar configuración progresivamente más tolerante
+            config_index = min(attempt, len(rtsp_configs) - 1)
+            current_config = rtsp_configs[config_index]
+            
+            print(f"🔧 Usando {current_config['name']}")
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "|".join(current_config['options'])
 
             if use_gstreamer:
                 # Pipeline GStreamer para RTSP H264 por TCP (requiere OpenCV con GStreamer)
                 pipeline = (
-                    f"rtspsrc location={rtsp_url} protocols=tcp ! "
-                    "rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! appsink drop=true sync=false"
+                    f"rtspsrc location={rtsp_url} protocols=tcp latency=0 ! "
+                    "rtph264depay ! h264parse config-interval=-1 ! "
+                    "avdec_h264 skip-frame=1 ! videoconvert ! "
+                    "appsink drop=true sync=false max-buffers=1"
                 )
                 cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
             else:
@@ -746,38 +1156,72 @@ def analyze_rtsp():
             if not cap.isOpened():
                 last_error = "No se pudo abrir el stream RTSP"
                 print(f"⚠️  {last_error}")
-                time.sleep(1.0)
+                time.sleep(2.0)  # Espera más larga entre intentos
                 continue
 
-            # Reducir buffering si la implementación lo soporta
+            # Configurar resolución si es posible (para cámaras de alta resolución)
+            if auto_resize and max_resolution:
+                try:
+                    max_width, max_height = map(int, max_resolution.split('x'))
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, max_width)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, max_height)
+                    print(f"🎥 Configurando resolución RTSP a: {max_width}x{max_height}")
+                except Exception as e:
+                    print(f"⚠️ No se pudo configurar resolución: {e}")
+
+            # Configuraciones adicionales para manejar streams corruptos
             try:
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                cap.set(cv2.CAP_PROP_FPS, 15)  # Limitar FPS para reducir carga
             except Exception:
                 pass
 
             start_time = time.time()
             frames_read = 0
+            valid_frames = 0
             img = None
 
+            # Intentar capturar múltiples frames y usar el mejor
             while time.time() - start_time < timeout_sec:
-                ok, frame = cap.read()
-                if ok and frame is not None:
-                    frames_read += 1
-                    if frames_read >= warmup_frames:
-                        img = frame
-                        break
-                else:
-                    # Espera corta para no bloquear CPU
-                    time.sleep(0.02)
+                try:
+                    ok, frame = cap.read()
+                    if ok and frame is not None:
+                        frames_read += 1
+                        
+                        # Validar que el frame no esté completamente corrupto
+                        if frame.shape[0] > 100 and frame.shape[1] > 100:  # Tamaño mínimo razonable
+                            # Verificar que no sea completamente negro o blanco
+                            mean_val = np.mean(frame)
+                            if 10 < mean_val < 245:  # Rango razonable de intensidad
+                                valid_frames += 1
+                                img = frame
+                                
+                                # Si tenemos suficientes frames válidos, usar este
+                                if valid_frames >= max(1, warmup_frames // 2):
+                                    print(f"✅ Frame válido capturado (intento {valid_frames})")
+                                    break
+                        
+                        # Si hemos leído muchos frames sin éxito, continuar
+                        if frames_read > warmup_frames * 2:
+                            break
+                            
+                except Exception as frame_error:
+                    print(f"⚠️ Error leyendo frame: {frame_error}")
+                    time.sleep(0.05)
+                    continue
+                
+                # Espera corta para no bloquear CPU
+                time.sleep(0.02)
 
             cap.release()
 
-            if img is not None:
+            if img is not None and valid_frames > 0:
+                print(f"✅ Captura exitosa con {current_config['name']} ({valid_frames} frames válidos)")
                 break
 
-            last_error = f"Timeout leyendo frame del RTSP (>{timeout_sec}s)"
+            last_error = f"Timeout o frames corruptos en RTSP (>{timeout_sec}s, {valid_frames} frames válidos)"
             print(f"⚠️  {last_error}")
-            time.sleep(1.0)
+            time.sleep(2.0)
 
         if img is None:
             return jsonify({
@@ -787,9 +1231,37 @@ def analyze_rtsp():
                     "Verifica la URL y que el puerto 8554 esté accesible desde este host",
                     "Prueba en VLC/ffplay: usa transporte TCP",
                     "Si usas MediaMTX, valida que la ruta /cam1 exista y esté publicando",
-                    "Puedes llamar con use_gstreamer=true si tienes GStreamer instalado"
+                    "Puedes llamar con use_gstreamer=true si tienes GStreamer instalado",
+                    "Para cámaras de 12MP, usa max_resolution='1920x1080' para mejor rendimiento"
                 ]
             }), 504
+
+        # Obtener dimensiones originales
+        original_height, original_width = img.shape[:2]
+        print(f"📐 Imagen RTSP original: {original_width}x{original_height}")
+        
+        # Auto-redimensionar si la imagen es demasiado grande (cámaras de alta resolución)
+        if auto_resize and max_resolution:
+            max_width, max_height = map(int, max_resolution.split('x'))
+            
+            # Si la imagen es significativamente más grande que la resolución máxima
+            if original_width > max_width * 1.5 or original_height > max_height * 1.5:
+                print(f"🔄 Redimensionando imagen de alta resolución: {original_width}x{original_height} -> {max_width}x{max_height}")
+                
+                # Calcular ratio manteniendo aspecto
+                ratio = min(max_width / original_width, max_height / original_height)
+                new_width = int(original_width * ratio)
+                new_height = int(original_height * ratio)
+                
+                img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                print(f"✅ Imagen redimensionada a: {new_width}x{new_height}")
+
+        # Guardar imagen original capturada (sin procesamiento)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        original_filename = f"capture_{timestamp}_rtsp_original.jpg"
+        original_path = os.path.join("static", original_filename)
+        cv2.imwrite(original_path, img)
+        print(f"📁 Imagen original RTSP guardada: {original_path}")
 
         # Ejecutar el modelo
         results = model.predict(img, conf=confidence, verbose=False)
@@ -801,12 +1273,28 @@ def analyze_rtsp():
         # Obtener dimensiones de la imagen RTSP
         img_height, img_width = img.shape[:2]
         img_size = (img_width, img_height)
-        zones_reference_size = (1920, 1080)  # Tamaño de referencia para las zonas
+        
+        # Las zonas fueron creadas en una imagen de 1280x720, usar esto como referencia
+        zones_reference_size = (1280, 720)  # Tamaño real donde se crearon las zonas
+        
+        # Calcular el factor de escala basado en el tamaño real de referencia
+        scale_factor_x = img_width / 1280
+        scale_factor_y = img_height / 720
+        avg_scale_factor = (scale_factor_x + scale_factor_y) / 2
+        
         print(f"📐 Tamaño de imagen RTSP: {img_width}x{img_height}")
         print(f"📏 Tamaño de referencia de zonas: {zones_reference_size}")
-
-        # Escalar zonas para el dibujo
-        scaled_zones_for_drawing = scale_zones_to_image(zones, zones_reference_size, img_size)
+        print(f"📏 Factor de escala promedio: {avg_scale_factor:.2f}")
+        
+        # Siempre escalar las zonas desde 1280x720 al tamaño actual de la imagen
+        if abs(avg_scale_factor - 1.0) > 0.1:  # Si hay diferencia significativa
+            scaled_zones_for_drawing = scale_zones_to_image(zones, zones_reference_size, img_size)
+            print(f"🔄 Escalando zonas desde {zones_reference_size} a {img_size}")
+            print(f"📏 Factores de escala: X={scale_factor_x:.3f}, Y={scale_factor_y:.3f}")
+        else:
+            # La imagen tiene un tamaño muy similar a 1280x720, usar zonas sin escalar
+            scaled_zones_for_drawing = zones
+            print(f"✅ Tamaño similar a referencia (1280x720), usando zonas sin escalar")
  
         if len(results[0].boxes) > 0:
             # Filtrar detecciones duplicadas
@@ -842,10 +1330,11 @@ def analyze_rtsp():
             confidence_threshold=confidence
         )
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Guardar imagen procesada (con análisis)
         processed_filename = f"analysis_{timestamp}_rtsp_conf80.jpg"
         processed_path = os.path.join("static", processed_filename)
         cv2.imwrite(processed_path, processed_img)
+        print(f"📁 Imagen procesada RTSP guardada: {processed_path}")
 
         filtered_results = {k: v for k, v in zone_counts.items() if v > 0}
 
@@ -857,6 +1346,7 @@ def analyze_rtsp():
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "zones_loaded": len(zones),
             "processed_image": f"/static/{processed_filename}",
+            "original_image": f"/static/{original_filename}",
             "detections_by_zone": detections_by_zone
         })
 

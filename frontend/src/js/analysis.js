@@ -422,6 +422,81 @@ async function analyzeImage() {
     }
 }
 
+// Capturar y analizar desde cámara local
+async function captureFromLocalCamera() {
+    try {
+        // Validar formulario primero
+        const distribucion = document.getElementById('distribucion').value;
+        if (!distribucion) {
+            showNotification('Por favor selecciona una distribución (Roja/Bicolor)', 'error');
+            return;
+        }
+
+        if (!currentProfile) {
+            showNotification('Por favor selecciona un perfil de análisis', 'error');
+            return;
+        }
+
+        const cameraType = document.getElementById('camera-type').value || 'usb';
+        const cameraIndex = parseInt(document.getElementById('camera-index').value) || 0;
+
+        // Mostrar loading
+        showLoading();
+        hideSection('results-section');
+        updateLoadingStatus(`Accediendo a cámara ${cameraType.toUpperCase()}...`);
+
+        // Llamar endpoint backend
+        const response = await fetch('/capture_local_camera', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                profile: currentProfile,
+                distribucion: distribucion,
+                camera_type: cameraType,
+                camera_index: cameraIndex
+            })
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Error del servidor: ${response.status} ${text}`);
+        }
+
+        updateLoadingStatus('Procesando imagen capturada...');
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Error en la captura de cámara local');
+        }
+
+        // Guardar resultados
+        analysisResults = result;
+        hideLoading();
+        displayResults(result);
+
+        // Mostrar notificación de éxito
+        const cameraName = `Cámara ${result.camera_used || cameraIndex}`;
+        if ((result.total_cherries || 0) === 0) {
+            showNotification(`Captura OK desde ${cameraName}, pero no se detectaron cerezas. Revisa encuadre/iluminación.`, 'info');
+        } else {
+            showNotification(`Análisis completado desde ${cameraName}: ${result.total_cherries} detecciones`, 'success');
+        }
+
+        // Ocultar formulario y mostrar resultados
+        hideSection('form-section');
+
+    } catch (err) {
+        console.error('Error en captura de cámara local:', err);
+        hideLoading();
+        showNotification(`Error captura local: ${err.message}`, 'error');
+        
+        // Mostrar sugerencias específicas
+        if (err.message.includes('No se pudo acceder')) {
+            showNotification('Verifica que la cámara esté conectada y no esté siendo usada por otra aplicación', 'info');
+        }
+    }
+}
+
 // Analizar desde RTSP
 async function analyzeFromRTSP() {
     try {
@@ -450,7 +525,9 @@ async function analyzeFromRTSP() {
                 timeout_sec: 8,
                 warmup_frames: 5,
                 profile: currentProfile, // Agregar perfil seleccionado
-                distribucion: document.getElementById('distribucion').value // Agregar distribución
+                distribucion: document.getElementById('distribucion').value, // Agregar distribución
+                max_resolution: '1920x1080', // Resolución máxima para cámaras de alta resolución
+                auto_resize: true // Auto-redimensionar cámaras de alta resolución
             })
         });
 
@@ -488,6 +565,36 @@ function displayResults(results) {
     document.getElementById('total-cherries').textContent = results.total_cherries || 0;
     document.getElementById('analysis-timestamp').textContent = results.timestamp || '-';
     document.getElementById('zones-analyzed').textContent = results.zones_loaded || 0;
+    
+    // Mostrar imagen original (si está disponible, típicamente para RTSP)
+    if (results.original_image) {
+        const originalImageContainer = document.getElementById('original-image-container');
+        const originalImage = document.getElementById('original-image');
+        
+        if (originalImageContainer && originalImage) {
+            originalImage.src = results.original_image;
+            originalImage.onload = function() {
+                this.classList.add('loaded');
+            };
+            originalImageContainer.style.display = 'block';
+            
+            // Actualizar información de la imagen original
+            const imageInfo = originalImageContainer.querySelector('.image-analysis-info');
+            if (imageInfo && results.image_size) {
+                // Actualizar el último span con el tamaño de imagen
+                const spans = imageInfo.querySelectorAll('span');
+                if (spans.length >= 3) {
+                    spans[2].innerHTML = `<i class="fas fa-expand-arrows-alt"></i> ${results.image_size}`;
+                }
+            }
+        }
+    } else {
+        // Ocultar contenedor de imagen original si no hay imagen original
+        const originalImageContainer = document.getElementById('original-image-container');
+        if (originalImageContainer) {
+            originalImageContainer.style.display = 'none';
+        }
+    }
     
     // Mostrar imagen analizada
     if (results.processed_image) {
@@ -1099,6 +1206,7 @@ window.AnalysisApp = {
 window.onProfileChange = onProfileChange;
 window.analyzeImage = analyzeImage;
 window.analyzeFromRTSP = analyzeFromRTSP;
+window.captureFromLocalCamera = captureFromLocalCamera;
 window.goBack = goBack;
 window.goHome = goHome;
 window.goToHistory = goToHistory;
