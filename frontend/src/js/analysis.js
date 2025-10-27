@@ -795,19 +795,94 @@ function editResults() {
     showNotification('Función de edición en desarrollo', 'info');
 }
 
-function uploadData() {
+async function uploadData() {
     if (!analysisResults) {
         showNotification('No hay datos para subir', 'error');
         return;
     }
     
-    // Simular subida a SDT
-    showNotification('Subiendo datos a SDT...', 'info');
-    
-    setTimeout(() => {
-        showNotification('Datos subidos exitosamente a SDT', 'success');
-        showSuccessMessage();
-    }, 2000);
+    try {
+        showNotification('Subiendo datos a PostgreSQL...', 'info');
+        
+        // Preparar datos para enviar
+        const uploadPayload = {
+            analysis_data: {
+                source_type: "uploaded_file",
+                confidence_used: analysisResults.confidence_used || 0.8
+            },
+            form_data: {
+                user: currentUser.name,
+                profile: currentProfile,
+                distribucion: document.getElementById('distribucion').value,
+                analysis_type: analysisType,
+                guia_sii: document.getElementById('guia-sii').value,
+                lote: document.getElementById('lote').value,
+                num_frutos: parseInt(document.getElementById('num-frutos').value),
+                num_proceso: document.getElementById('num-proceso')?.value || null,
+                id_caja: document.getElementById('id-caja')?.value || null
+            },
+            results_data: {
+                results: analysisResults.results || {},
+                total_cherries: analysisResults.total_cherries || 0,
+                confidence_used: analysisResults.confidence_used || 0.8,
+                zones_loaded: analysisResults.zones_loaded || 0,
+                processed_image: analysisResults.processed_image || null,
+                detections_by_zone: analysisResults.detections_by_zone || {},
+                image_size: analysisResults.image_size || null,
+                zones_available: analysisResults.zones_available || []
+            }
+        };
+        
+        // Enviar al endpoint de forzar subida
+        const response = await fetch('/force_upload_analysis', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(uploadPayload)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification(`Datos subidos exitosamente a PostgreSQL (ID: ${result.analysis_id})`, 'success');
+            
+            // Actualizar estado del análisis
+            if (analysisResults) {
+                analysisResults.database_status = 'saved_to_postgresql';
+                analysisResults.analysis_id = result.analysis_id;
+                analysisResults.synced = true;
+            }
+            
+            showSuccessMessage();
+        } else {
+            throw new Error(result.error || 'Error desconocido en la subida');
+        }
+        
+    } catch (error) {
+        console.error('Error subiendo datos:', error);
+        showNotification('Error subiendo datos: ' + error.message, 'error');
+        
+        // Si falla PostgreSQL, intentar guardar en caché local
+        try {
+            const cacheResponse = await fetch('/save_to_cache', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(uploadPayload)
+            });
+            
+            const cacheResult = await cacheResponse.json();
+            
+            if (cacheResult.success) {
+                showNotification('Datos guardados en caché local para sincronización posterior', 'warning');
+            }
+            
+        } catch (cacheError) {
+            console.error('Error guardando en caché:', cacheError);
+        }
+    }
 }
 
 function saveData() {

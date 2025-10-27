@@ -16,7 +16,7 @@ Sistema completo de análisis de calidad de cerezas con interfaz web moderna bas
 ```
 cherries/
 ├── backend/                 # Servidor Flask
-│   ├── app.py              # Aplicación principal
+│   ├── app.py              # Aplicación principal1
 │   ├── best.pt             # Modelo YOLO entrenado
 │   ├── zones.json          # Definición de zonas
 │   ├── requirements.txt    # Dependencias Python

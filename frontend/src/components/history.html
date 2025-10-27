@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Historial - RancoQC T25</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+
+  <style>
+    :root{
+      --bg:#0f172a;           /* slate-900 */
+      --panel:#111827;        /* gray-900 */
+      --panel-2:#0b1220;      /* darker */
+      --card:#0b1324;
+      --muted:#94a3b8;        /* slate-400 */
+      --text:#e5e7eb;         /* gray-200 */
+      --brand:#dc2626;        /* red-600 */
+      --brand-2:#ef4444;      /* red-500 */
+      --accent:#22c55e;       /* green-500 */
+      --warn:#f59e0b;         /* amber-500 */
+      --border:#1f2937;       /* gray-800 */
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+
+    *{box-sizing:border-box}
+    html,body{
+      margin:0; padding:0;
+      background: radial-gradient(1200px 1200px at -10% -20%, #1f2937 0%, #0f172a 40%, #0b1220 100%);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+      min-height:100%;
+    }
+
+    /* Header */
+    .header{
+      position:sticky; top:0; z-index:20;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 20px;
+      background: linear-gradient(180deg, rgba(17,24,39,0.95), rgba(17,24,39,0.85));
+      border-bottom:1px solid var(--border);
+      backdrop-filter: blur(6px);
+    }
+    .header-left{display:flex;align-items:center;gap:12px}
+    .logo-section{display:flex;align-items:center;gap:12px}
+    .logo{height:40px;width:auto;object-fit:contain;filter:drop-shadow(0 6px 12px rgba(0,0,0,.45))}
+    #module-title{font-size:20px;margin:0}
+    .header-right{display:flex;align-items:center;gap:16px}
+    .db-status{
+      display:flex;align-items:center;gap:8px;
+      padding:6px 10px;border:1px solid var(--border);
+      border-radius:10px;background:rgba(2,6,23,.6);
+      font-size:13px;color:var(--muted)
+    }
+    .db-status.ok{border-color:rgba(34,197,94,.35); color:#bbf7d0}
+    .db-status.warn{border-color:rgba(245,158,11,.35); color:#fde68a}
+    .db-status.err{border-color:rgba(239,68,68,.35); color:#fecaca}
+
+    .user-info{display:flex;align-items:center;gap:10px;color:var(--muted)}
+    .current-time{font-variant-numeric:tabular-nums}
+
+    /* Main */
+    .main-content{
+      max-width:1200px;
+      margin:24px auto;
+      padding:0 18px 60px;
+    }
+
+    /* Buttons */
+    .btn-icon{
+      border:none; background:rgba(2,6,23,.7);
+      color:var(--text); width:38px; height:38px; border-radius:10px;
+      display:inline-flex; align-items:center; justify-content:center;
+      cursor:pointer; border:1px solid var(--border);
+      transition: all .18s ease;
+    }
+    .btn-icon:hover{transform:translateY(-1px); background:rgba(2,6,23,.9)}
+    .btn-primary, .btn-secondary{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:10px 14px; border-radius:10px; border:1px solid transparent;
+      font-weight:600; cursor:pointer; transition: all .18s ease;
+    }
+    .btn-primary{background:linear-gradient(135deg, var(--brand), var(--brand-2)); color:white; box-shadow: var(--shadow)}
+    .btn-primary:hover{filter:brightness(1.05); transform:translateY(-1px)}
+    .btn-secondary{background:rgba(2,6,23,.7); color:var(--text); border-color:var(--border)}
+    .btn-secondary:hover{background:rgba(2,6,23,.9)}
+
+    /* Filters */
+    .filters-section{
+      background: linear-gradient(180deg, rgba(2,6,23,.6), rgba(2,6,23,.35));
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:16px;
+      box-shadow: var(--shadow);
+    }
+    .form-group-inline{display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end}
+    .form-group{display:flex; flex-direction:column; gap:6px; min-width:220px}
+    .form-group label{color:var(--muted); font-size:13px}
+    select{
+      background:rgba(2,6,23,.8); color:var(--text);
+      border:1px solid var(--border); border-radius:10px;
+      padding:9px 12px; outline:none;
+    }
+    select:focus{border-color:#334155; box-shadow:0 0 0 3px rgba(148,163,184,.15)}
+
+    /* Stats */
+    .stats-section{margin:18px 0}
+    .stats-grid{
+      display:grid; grid-template-columns: repeat(3, 1fr);
+      gap:14px;
+    }
+    .stat-card{
+      display:flex; gap:12px; align-items:center;
+      padding:14px; border:1px solid var(--border); border-radius:12px;
+      background: radial-gradient(600px 400px at -10% -20%, rgba(220,38,38,.15), rgba(2,6,23,.35) 60%);
+    }
+    .stat-card:nth-child(2){background: radial-gradient(600px 400px at -10% -20%, rgba(34,197,94,.15), rgba(2,6,23,.35) 60%)}
+    .stat-card:nth-child(3){background: radial-gradient(600px 400px at -10% -20%, rgba(245,158,11,.15), rgba(2,6,23,.35) 60%)}
+    .stat-icon{
+      width:40px;height:40px;border-radius:10px;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.25); border:1px solid var(--border);
+    }
+    .stat-info h3{margin:0; font-size:22px}
+    .stat-info p{margin:2px 0 0; color:var(--muted); font-size:13px}
+
+    /* History */
+    .history-section{
+      margin-top:18px;
+      background:rgba(2,6,23,.45);
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      box-shadow: var(--shadow);
+    }
+    .history-header{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px; border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(15,23,42,.8), rgba(2,6,23,.4));
+    }
+    .history-header h2{margin:0; display:flex; align-items:center; gap:10px}
+    .history-actions{display:flex; gap:8px}
+
+    /* Table */
+    .history-table-container{width:100%; overflow:auto}
+    .history-table{
+      width:100%; border-collapse:separate; border-spacing:0; min-width:900px;
+    }
+    .history-table thead th{
+      text-align:left; font-weight:700; font-size:13px; letter-spacing:.02em;
+      padding:12px 14px; color:#cbd5e1; background:rgba(2,6,23,.7);
+      position:sticky; top:0; z-index:5; border-bottom:1px solid var(--border);
+    }
+    .history-table tbody td{
+      padding:12px 14px; border-bottom:1px solid var(--border); color:#e2e8f0;
+    }
+    .history-table tbody tr:hover{background:rgba(148,163,184,.07)}
+    .badge{
+      display:inline-flex; align-items:center; gap:6px; padding:6px 10px;
+      border-radius:999px; font-size:12px; border:1px solid var(--border); background:rgba(2,6,23,.6)
+    }
+    .badge.ok{border-color:rgba(34,197,94,.35); color:#86efac}
+    .badge.warn{border-color:rgba(245,158,11,.35); color:#fcd34d}
+    .badge.err{border-color:rgba(239,68,68,.35); color:#fecaca}
+
+    /* Loading */
+    .loading-container{display:flex; gap:12px; align-items:center; padding:18px; color:var(--muted)}
+    .spinner{
+      width:18px;height:18px;border:3px solid rgba(148,163,184,.25);
+      border-top-color:#e5e7eb;border-radius:50%; animation:spin 1s linear infinite
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* No results */
+    .no-results{
+      text-align:center; padding:40px 14px; color:var(--muted)
+    }
+    .no-results i{font-size:28px; margin-bottom:6px; color:#94a3b8}
+
+    /* Modal */
+    .modal{
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.55); backdrop-filter: blur(2px); z-index:50;
+    }
+    .modal.open{display:flex}
+    .modal-content{
+      width:min(960px, 92vw);
+      background:linear-gradient(180deg, rgba(2,6,23,.9), rgba(2,6,23,.8));
+      border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow: var(--shadow)
+    }
+    .modal-header, .modal-footer{
+      padding:14px 16px; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between
+    }
+    .modal-footer{border-bottom:none; border-top:1px solid var(--border)}
+    .modal-body{padding:16px}
+    .close-btn{background:transparent; border:none; color:#e2e8f0; cursor:pointer; font-size:18px}
+    .details-grid{
+      display:grid; grid-template-columns: 1.2fr .8fr; gap:16px
+    }
+    .details-image img{
+      width:100%; height:auto; border-radius:10px; border:1px solid var(--border)
+    }
+
+    /* Responsive */
+    @media (max-width: 980px){
+      .stats-grid{grid-template-columns: 1fr}
+      .details-grid{grid-template-columns: 1fr}
+      .form-group{min-width:160px}
+      .logo{height:32px}
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <button class="btn-icon" onclick="goBack()">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <div class="logo-section">
+        <img src="../public/LogoColor.ddc5d2c8.png" alt="RancoQC" class="logo">
+        <h1 id="module-title">Historial de Análisis</h1>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="db-status" id="db-status">
+        <i class="fas fa-database"></i>
+        <span id="db-status-text">Verificando...</span>
+      </div>
+      <div class="user-info">
+        <span id="user-name">Usuario</span>
+        <span class="current-time" id="current-time">00:00</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenido Principal -->
+  <main class="main-content">
+    <!-- Filtros -->
+    <section class="filters-section">
+      <div class="form-group-inline">
+        <div class="form-group">
+          <label for="filter-user">Usuario:</label>
+          <select id="filter-user">
+            <option value="">Todos los usuarios</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="filter-type">Tipo de Análisis:</label>
+          <select id="filter-type">
+            <option value="">Todos los tipos</option>
+            <option value="qc_recepcion">QC Recepción</option>
+            <option value="packing_qc">Packing QC</option>
+            <option value="contramuestra">Contramuestra</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="filter-limit">Mostrar:</label>
+          <select id="filter-limit">
+            <option value="20">Últimos 20</option>
+            <option value="50" selected>Últimos 50</option>
+            <option value="100">Últimos 100</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="loadHistory()">
+          <i class="fas fa-search"></i>
+          Buscar
+        </button>
+        <button class="btn-secondary" onclick="syncPendingData()" id="sync-btn">
+          <i class="fas fa-sync-alt"></i>
+          Sincronizar
+        </button>
+      </div>
+    </section>
+
+    <!-- Estadísticas -->
+    <section class="stats-section" id="stats-section" style="display: none;">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-chart-bar"></i>
+          </div>
+          <div class="stat-info">
+            <h3 id="total-records">0</h3>
+            <p>Registros Totales</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-database"></i>
+          </div>
+          <div class="stat-info">
+            <h3 id="synced-records">0</h3>
+            <p>Sincronizados</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-clock"></i>
+          </div>
+          <div class="stat-info">
+            <h3 id="pending-records">0</h3>
+            <p>Pendientes</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Historial -->
+    <section class="history-section">
+      <div class="history-header">
+        <h2>
+          <i class="fas fa-history"></i>
+          Historial de Análisis
+        </h2>
+        <div class="history-actions">
+          <button class="btn-secondary" onclick="exportHistoryToExcel()" id="export-btn">
+            <i class="fas fa-file-excel"></i>
+            Exportar Excel
+          </button>
+          <button class="btn-secondary" onclick="clearSyncedCache()" id="clear-cache-btn">
+            <i class="fas fa-trash"></i>
+            Limpiar Caché
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading-container" id="history-loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Cargando historial...</p>
+      </div>
+
+      <!-- Tabla de Historial -->
+      <div class="history-table-container" id="history-table-container">
+        <table class="history-table" id="history-table">
+          <thead>
+            <tr>
+              <th>Fecha/Hora</th>
+              <th>Usuario</th>
+              <th>Tipo</th>
+              <th>Lote</th>
+              <th>Distribución</th>
+              <th>Detecciones</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody">
+            <!-- Los datos se cargarán dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Sin resultados -->
+      <div class="no-results" id="no-results" style="display: none;">
+        <i class="fas fa-search"></i>
+        <h3>No se encontraron registros</h3>
+        <p>Prueba ajustando los filtros de búsqueda</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal de Detalles -->
+  <div id="details-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>
+          <i class="fas fa-info-circle"></i>
+          Detalles del Análisis
+        </h2>
+        <button class="close-btn" onclick="closeDetailsModal()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="details-grid" id="details-content">
+          <!-- Contenido se carga dinámicamente -->
+        </div>
+        <div class="details-image" id="details-image-container" style="display: none;">
+          <img id="details-image" alt="Imagen del análisis">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeDetailsModal()">Cerrar</button>
+        <button class="btn-primary" onclick="downloadAnalysisReport()" id="download-report-btn">
+          <i class="fas fa-download"></i>
+          Descargar Reporte
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmación -->
+  <div id="confirm-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>
+          <i class="fas fa-exclamation-triangle"></i>
+          Confirmar Acción
+        </h2>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-message">¿Estás seguro de que deseas realizar esta acción?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeConfirmModal()">Cancelar</button>
+        <button class="btn-primary" onclick="confirmAction()" id="confirm-action-btn">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/history.js"></script>
+</body>
+</html>
