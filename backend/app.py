@@ -8,6 +8,17 @@ import os
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 import time
+from dotenv import load_dotenv
+
+# Importar funciones de base de datos
+from database import (
+    create_tables, test_db_connection, save_analysis_result, 
+    get_analysis_history, sync_pending_data, save_to_local_cache,
+    get_local_history, DB_AVAILABLE
+)
+
+# Cargar variables de entorno
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Permitir requests desde frontend
@@ -441,6 +452,11 @@ def analysis():
     """Página de análisis"""
     return send_from_directory('../frontend/src/components', 'analysis.html')
 
+@app.route('/history')
+def history():
+    """Página de historial"""
+    return send_from_directory('../frontend/src/components', 'history.html')
+
 @app.route('/<page>.html')
 def redirect_html(page):
     """Redirige rutas con .html a su equivalente sin extensión"""
@@ -563,6 +579,46 @@ def analyze_cherries():
         print(f"📊 Resultados por zona: {filtered_results}")
         print(f"📁 Imagen procesada guardada: {processed_path}")
         
+        # Preparar datos para guardar en base de datos
+        analysis_data = {
+            "source_type": "uploaded_file",
+            "source_name": file.filename,
+            "confidence_used": confidence
+        }
+        
+        form_data = {
+            "user": request.form.get('user', 'Unknown'),
+            "profile": profile,
+            "distribucion": distribucion,
+            "analysis_type": profile.replace('_', '-'),
+            "guia_sii": request.form.get('guia_sii', ''),
+            "lote": request.form.get('lote', ''),
+            "num_frutos": int(request.form.get('num_frutos', 0)),
+            "num_proceso": request.form.get('num_proceso'),
+            "id_caja": request.form.get('id_caja')
+        }
+        
+        results_data = {
+            "results": filtered_results,
+            "total_cherries": total_detections,
+            "confidence_used": confidence,
+            "zones_loaded": len(zones),
+            "processed_image": f"/static/{processed_filename}",
+            "detections_by_zone": detections_by_zone,
+            "image_size": f"{img_width}x{img_height}",
+            "zones_available": list(zones.keys())
+        }
+        
+        # Guardar en base de datos (PostgreSQL o local)
+        try:
+            analysis_id, saved_to_main_db = save_analysis_result(analysis_data, form_data, results_data)
+            db_status = "saved_to_postgresql" if saved_to_main_db else "saved_to_local_cache"
+            print(f"✅ Análisis guardado: {db_status}, ID: {analysis_id}")
+        except Exception as e:
+            print(f"⚠️ Error guardando análisis: {e}")
+            analysis_id = None
+            db_status = "save_failed"
+
         return jsonify({
             "success": True,
             "results": filtered_results,
@@ -573,7 +629,10 @@ def analyze_cherries():
             "processed_image": f"/static/{processed_filename}",
             "detections_by_zone": detections_by_zone,
             "image_size": f"{img_width}x{img_height}",
-            "zones_available": list(zones.keys())
+            "zones_available": list(zones.keys()),
+            "analysis_id": analysis_id,
+            "database_status": db_status,
+            "db_connected": DB_AVAILABLE
         })
         
     except Exception as e:
@@ -1356,8 +1415,198 @@ def analyze_rtsp():
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)})
 
+# Nuevos endpoints para base de datos e historial
+@app.route('/get_analysis_history', methods=['GET'])
+def get_analysis_history_endpoint():
+    """Obtener historial de análisis"""
+    try:
+        limit = int(request.args.get('limit', 50))
+        user_name = request.args.get('user_name')
+        analysis_type = request.args.get('analysis_type')
+        
+        history = get_analysis_history(limit, user_name, analysis_type)
+        
+        return jsonify({
+            "success": True,
+            "history": history,
+            "count": len(history),
+            "db_connected": DB_AVAILABLE
+        })
+        
+    except Exception as e:
+        print(f"❌ Error obteniendo historial: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/sync_pending_data', methods=['POST'])
+def sync_pending_data_endpoint():
+    """Sincronizar datos pendientes del caché local a PostgreSQL"""
+    try:
+        user_name = request.json.get('user_name') if request.json else None
+        
+        result = sync_pending_data()
+        
+        return jsonify({
+            "success": True,
+            "sync_result": result,
+            "db_connected": DB_AVAILABLE
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en sincronización: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/get_local_history', methods=['GET'])
+def get_local_history_endpoint():
+    """Obtener historial del caché local"""
+    try:
+        limit = int(request.args.get('limit', 50))
+        
+        history = get_local_history(limit)
+        
+        return jsonify({
+            "success": True,
+            "history": history,
+            "count": len(history),
+            "source": "local_cache"
+        })
+        
+    except Exception as e:
+        print(f"❌ Error obteniendo historial local: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/database_status', methods=['GET'])
+def database_status():
+    """Verificar estado de conexión a la base de datos"""
+    try:
+        connection_ok, message = test_db_connection()
+        
+        return jsonify({
+            "success": True,
+            "db_connected": connection_ok,
+            "connection_message": message,
+            "db_available": DB_AVAILABLE
+        })
+        
+    except Exception as e:
+        print(f"❌ Error verificando estado de base de datos: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "db_connected": False,
+            "db_available": DB_AVAILABLE
+        })
+
+@app.route('/clear_local_cache', methods=['POST'])
+def clear_local_cache():
+    """Limpiar caché local (solo registros sincronizados)"""
+    try:
+        from database import get_local_session, LocalCache
+        
+        local_db = get_local_session()
+        
+        # Solo eliminar registros que ya fueron sincronizados
+        synced_records = local_db.query(LocalCache)\
+            .filter(LocalCache.status == 'synced')\
+            .all()
+        
+        count = len(synced_records)
+        
+        for record in synced_records:
+            local_db.delete(record)
+        
+        local_db.commit()
+        local_db.close()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Se eliminaron {count} registros sincronizados del caché local"
+        })
+        
+    except Exception as e:
+        print(f"❌ Error limpiando caché local: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/force_upload_analysis', methods=['POST'])
+def force_upload_analysis():
+    """Forzar subida de análisis a PostgreSQL desde el frontend"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"success": False, "error": "No se enviaron datos"})
+        
+        analysis_data = data.get('analysis_data', {})
+        form_data = data.get('form_data', {})
+        results_data = data.get('results_data', {})
+        
+        # Guardar directamente en PostgreSQL
+        analysis_id, success = save_analysis_result(analysis_data, form_data, results_data)
+        
+        if success:
+            return jsonify({
+                "success": True,
+                "analysis_id": analysis_id,
+                "message": "Análisis subido exitosamente a PostgreSQL"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "No se pudo subir a PostgreSQL, guardado en caché local",
+                "cache_id": analysis_id
+            })
+            
+    except Exception as e:
+        print(f"❌ Error en forzar subida: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/save_to_cache', methods=['POST'])
+def save_to_cache_endpoint():
+    """Guardar análisis específicamente en caché local"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"success": False, "error": "No se enviaron datos"})
+        
+        analysis_data = data.get('analysis_data', {})
+        form_data = data.get('form_data', {})
+        results_data = data.get('results_data', {})
+        
+        # Guardar solo en caché local
+        cache_id, success = save_to_local_cache(analysis_data, form_data, results_data)
+        
+        if cache_id:
+            return jsonify({
+                "success": True,
+                "cache_id": cache_id,
+                "message": "Análisis guardado en caché local para sincronización posterior"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "No se pudo guardar en caché local"
+            })
+            
+    except Exception as e:
+        print(f"❌ Error guardando en caché: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
 if __name__ == '__main__':
     print("🚀 Iniciando servidor RancoQC...")
+    
+    # Inicializar base de datos
+    try:
+        create_tables()
+        connection_ok, message = test_db_connection()
+        if connection_ok:
+            print(f"✅ Base de datos conectada: {message}")
+        else:
+            print(f"⚠️ Base de datos: {message}")
+            print("📁 Usando SQLite local como fallback")
+    except Exception as e:
+        print(f"⚠️ Error inicializando base de datos: {e}")
+        print("📁 Continuando con SQLite local")
+    
     # Nota: las zonas se cargan dinámicamente ahora
     print("🌐 Accede a: http://localhost:5001")
     
