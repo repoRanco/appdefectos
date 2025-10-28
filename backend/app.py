@@ -785,75 +785,67 @@ def capture_local_camera():
             try:
                 print("🍓 Intentando captura con Raspberry Pi Camera Module...")
                 
-                # Método 1: Usar libcamera-still (Raspberry Pi OS Bullseye+)
+                # Importar módulos necesarios
                 import subprocess
                 import tempfile
                 
+                # Crear archivo temporal
                 with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
                     temp_path = temp_file.name
                 
-                # Comando libcamera-still para Raspberry Pi Camera Module
-                cmd = [
-                    'libcamera-still',
-                    '-o', temp_path,
-                    '--width', '1920',
-                    '--height', '1080',
-                    '--timeout', '2000',  # 2 segundos timeout
-                    '--nopreview',
-                    '--immediate'
-                ]
-                
-                try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                # Intentar con rpicam-still (nuevo) o libcamera-still (antiguo)
+                cmd_name = None
+                for candidate in ["rpicam-still", "libcamera-still"]:
+                    result = subprocess.run(["which", candidate], capture_output=True, text=True)
                     if result.returncode == 0:
-                        # Leer imagen capturada
-                        frame = cv2.imread(temp_path)
-                        if frame is not None:
-                            print("✅ Captura exitosa con libcamera-still")
-                        os.unlink(temp_path)  # Eliminar archivo temporal
-                    else:
-                        print(f"⚠️ libcamera-still falló: {result.stderr}")
-                        print("ℹ️ Intentando captura con OpenCV como alternativa...")
-                except subprocess.TimeoutExpired:
-                    print("⚠️ Timeout en libcamera-still")
-                    print("ℹ️ Intentando captura con OpenCV como alternativa...")
-                except FileNotFoundError:
-                    print("⚠️ libcamera-still no encontrado")
-                    print("ℹ️ libcamera-apps no está instalado. Instala con: sudo apt install libcamera-apps")
-                    print("ℹ️ Intentando captura con OpenCV como alternativa...")
+                        cmd_name = candidate
+                        break
                 
-                # Método 2: Intentar con raspistill (Raspberry Pi OS Legacy)
-                if frame is None:
-                    print("🔄 Intentando con raspistill...")
+                if not cmd_name:
+                    print("⚠️ No se encontró rpicam-still ni libcamera-still")
+                    print("ℹ️ Intentando captura con OpenCV como alternativa...")
+                else:
+                    print(f"🍓 Usando comando: {cmd_name}")
+                    
+                    # Comando para capturar
                     cmd = [
-                        'raspistill',
-                        '-o', temp_path,
-                        '-w', '1920',
-                        '-h', '1080',
-                        '-t', '2000',  # 2 segundos timeout
-                        '-n',  # No preview
-                        '--immediate'
+                        cmd_name,
+                        '--immediate',
+                        f'--timeout=1200',
+                        '--quality=100',
+                        '--denoise=cdn_off',
+                        '--nopreview',
+                        '-o', temp_path
                     ]
-                
-                try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-                    if result.returncode == 0:
-                        frame = cv2.imread(temp_path)
-                        if frame is not None:
-                            print("✅ Captura exitosa con raspistill")
-                        os.unlink(temp_path)
-                    else:
-                        print(f"⚠️ raspistill falló: {result.stderr}")
-                        print("ℹ️ Continuando con OpenCV...")
-                except subprocess.TimeoutExpired:
-                    print("⚠️ Timeout en raspistill")
-                    print("ℹ️ Continuando con OpenCV...")
-                except FileNotFoundError:
-                    print("⚠️ raspistill no encontrado")
-                    print("ℹ️ Continuando con OpenCV...")
+                    
+                    try:
+                        print(f"🍓 Ejecutando: {' '.join(cmd)}")
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                        
+                        if result.returncode == 0:
+                            # Verificar que el archivo existe
+                            if os.path.exists(temp_path):
+                                # Leer imagen con OpenCV
+                                frame = cv2.imread(temp_path)
+                                if frame is not None:
+                                    print(f"✅ Captura exitosa con {cmd_name}: {frame.shape[1]}x{frame.shape[0]}")
+                                os.unlink(temp_path)
+                            else:
+                                print(f"⚠️ {cmd_name} no generó archivo")
+                        else:
+                            error_msg = result.stderr.strip() if result.stderr else "Error desconocido"
+                            print(f"⚠️ {cmd_name} falló (código {result.returncode}): {error_msg}")
+                            print("ℹ️ Intentando captura con OpenCV como alternativa...")
+                    except subprocess.TimeoutExpired:
+                        print("⚠️ Timeout en captura con rpi/libcamera")
+                        print("ℹ️ Intentando captura con OpenCV como alternativa...")
+                    except Exception as e:
+                        print(f"⚠️ Error con {cmd_name}: {e}")
+                        print("ℹ️ Intentando captura con OpenCV como alternativa...")
                 
             except Exception as e:
                 print(f"⚠️ Error en captura Raspberry Pi: {e}")
+                print("ℹ️ Intentando captura con OpenCV como alternativa...")
         
         # Si no se pudo capturar con Raspberry Pi o es cámara USB, usar OpenCV
         if frame is None:

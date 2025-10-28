@@ -28,16 +28,19 @@ sudo apt install -y libcamera-apps libcamera-tools
 echo ""
 echo "🔍 Verificando instalación..."
 
-if command -v libcamera-still &> /dev/null; then
+if command -v rpicam-still &> /dev/null; then
+    echo "✅ rpicam-still instalado correctamente (comando moderno)"
+    rpicam-still --version 2>&1 | head -n 1 || echo "Versión no disponible"
+elif command -v libcamera-still &> /dev/null; then
     echo "✅ libcamera-still instalado correctamente"
     libcamera-still --version 2>&1 | head -n 1 || echo "Versión no disponible"
 else
-    echo "❌ libcamera-still no se instaló correctamente"
+    echo "❌ Ni rpicam-still ni libcamera-still se instalaron correctamente"
 fi
 
 # Verificar si raspistill está disponible (sistemas legacy)
 if command -v raspistill &> /dev/null; then
-    echo "✅ raspistill también está disponible"
+    echo "✅ raspistill también está disponible (solo Raspberry Pi OS Legacy)"
 fi
 
 # Verificar cámaras disponibles

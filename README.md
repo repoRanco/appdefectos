@@ -183,9 +183,9 @@ Si estás ejecutando el sistema en una Raspberry Pi y quieres capturar fotos dir
 
 Una vez instalado libcamera, al seleccionar "Capturar con Raspberry (libcamera)" en la página de análisis:
 
-- El sistema intentará usar `libcamera-still` para capturar la foto
-- Si no está disponible, intentará con `raspistill` (sistemas legacy)
-- Si ambas fallan, usará OpenCV como alternativa automática
+- El sistema intentará usar `rpicam-still` (moderno) o `libcamera-still` (legacy) para capturar la foto
+- Si ninguno está disponible, usará OpenCV como alternativa automática
+- Captura a calidad 100 con configuración optimizada
 
 ## 🚨 Solución de Problemas
 
