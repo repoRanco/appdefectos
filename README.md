@@ -142,7 +142,72 @@ Editar `backend/zones.json` para definir las zonas de detección:
 - Notificaciones de éxito/error
 - Persistencia de datos en localStorage
 
+## 🍓 Raspberry Pi Camera Setup
+
+### Para usar la cámara de Raspberry Pi
+
+Si estás ejecutando el sistema en una Raspberry Pi y quieres capturar fotos directamente con el módulo de cámara:
+
+1. **Instalar libcamera-apps**:
+   ```bash
+   sudo apt update
+   sudo apt install -y libcamera-apps libcamera-tools
+   ```
+
+   O usar el script automático:
+   ```bash
+   sudo bash install_libcamera.sh
+   ```
+
+2. **Habilitar la cámara** (si está deshabilitada):
+   ```bash
+   sudo raspi-config
+   # Seleccionar: Interface Options > Camera > Enable
+   sudo reboot
+   ```
+
+3. **Verificar instalación**:
+   ```bash
+   libcamera-still --version
+   # Debe mostrar la versión instalada
+   ```
+
+4. **Probar la cámara**:
+   ```bash
+   libcamera-hello
+   # O capturar una foto de prueba:
+   libcamera-still -o test.jpg
+   ```
+
+### Usar en la aplicación
+
+Una vez instalado libcamera, al seleccionar "Capturar con Raspberry (libcamera)" en la página de análisis:
+
+- El sistema intentará usar `libcamera-still` para capturar la foto
+- Si no está disponible, intentará con `raspistill` (sistemas legacy)
+- Si ambas fallan, usará OpenCV como alternativa automática
+
 ## 🚨 Solución de Problemas
+
+### Error: libcamera-still no encontrado
+```
+⚠️ libcamera-still no encontrado
+ℹ️ libcamera-apps no está instalado. Instala con: sudo apt install libcamera-apps
+```
+**Solución**: 
+- Instalar libcamera-apps: `sudo apt install libcamera-apps`
+- O usar el script: `sudo bash install_libcamera.sh`
+- Luego reiniciar si es necesario
+
+### Error: Cámara no detectada en Raspberry Pi
+```
+[ WARN:0] can't open camera by index
+```
+**Solución**: 
+- Verificar que la cámara esté conectada
+- Ejecutar `ls /dev/video*` para ver dispositivos disponibles
+- Habilitar cámara con `sudo raspi-config`
+- Reiniciar: `sudo reboot`
 
 ### Error: Modelo no encontrado
 ```

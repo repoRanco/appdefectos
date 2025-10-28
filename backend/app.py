@@ -803,20 +803,24 @@ def capture_local_camera():
                     '--immediate'
                 ]
                 
-                try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-                    if result.returncode == 0:
-                        # Leer imagen capturada
-                        frame = cv2.imread(temp_path)
-                        if frame is not None:
-                            print("✅ Captura exitosa con libcamera-still")
-                        os.unlink(temp_path)  # Eliminar archivo temporal
-                    else:
-                        print(f"⚠️ libcamera-still falló: {result.stderr}")
-                except subprocess.TimeoutExpired:
-                    print("⚠️ Timeout en libcamera-still")
-                except FileNotFoundError:
-                    print("⚠️ libcamera-still no encontrado")
+                    try:
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                        if result.returncode == 0:
+                            # Leer imagen capturada
+                            frame = cv2.imread(temp_path)
+                            if frame is not None:
+                                print("✅ Captura exitosa con libcamera-still")
+                            os.unlink(temp_path)  # Eliminar archivo temporal
+                        else:
+                            print(f"⚠️ libcamera-still falló: {result.stderr}")
+                            print("ℹ️ Intentando captura con OpenCV como alternativa...")
+                    except subprocess.TimeoutExpired:
+                        print("⚠️ Timeout en libcamera-still")
+                        print("ℹ️ Intentando captura con OpenCV como alternativa...")
+                    except FileNotFoundError:
+                        print("⚠️ libcamera-still no encontrado")
+                        print("ℹ️ libcamera-apps no está instalado. Instala con: sudo apt install libcamera-apps")
+                        print("ℹ️ Intentando captura con OpenCV como alternativa...")
                 
                 # Método 2: Intentar con raspistill (Raspberry Pi OS Legacy)
                 if frame is None:
@@ -840,10 +844,13 @@ def capture_local_camera():
                             os.unlink(temp_path)
                         else:
                             print(f"⚠️ raspistill falló: {result.stderr}")
+                            print("ℹ️ Continuando con OpenCV...")
                     except subprocess.TimeoutExpired:
                         print("⚠️ Timeout en raspistill")
+                        print("ℹ️ Continuando con OpenCV...")
                     except FileNotFoundError:
                         print("⚠️ raspistill no encontrado")
+                        print("ℹ️ Continuando con OpenCV...")
                 
             except Exception as e:
                 print(f"⚠️ Error en captura Raspberry Pi: {e}")
@@ -852,26 +859,39 @@ def capture_local_camera():
         if frame is None:
             print("🔄 Intentando captura con OpenCV...")
             
+            # Si camera_type es raspberry, forzar índice 0
+            opencv_index = 0 if camera_type == 'raspberry' else camera_index
+            
             # Intentar abrir cámara local con OpenCV
-            cap = cv2.VideoCapture(camera_index)
+            cap = cv2.VideoCapture(opencv_index)
             
             if not cap.isOpened():
                 # Intentar con diferentes índices si el especificado falla
+                print(f"⚠️ No se pudo abrir cámara en índice {opencv_index}, probando otros...")
+                found_camera = False
                 for i in range(3):  # Probar índices 0, 1, 2
+                    if i == opencv_index:
+                        continue  # Ya probamos este
                     cap = cv2.VideoCapture(i)
                     if cap.isOpened():
+                        opencv_index = i
                         camera_index = i
                         print(f"✅ Cámara OpenCV encontrada en índice: {i}")
+                        found_camera = True
                         break
-                else:
+                    cap.release()
+                
+                if not found_camera:
                     return jsonify({
                         "success": False,
                         "error": "No se pudo acceder a ninguna cámara",
                         "suggestions": [
                             "Para Raspberry Pi: Verifica que la cámara esté habilitada con 'sudo raspi-config'",
                             "Para Raspberry Pi: Instala libcamera-tools: 'sudo apt install libcamera-apps'",
+                            "Para Raspberry Pi: Ejecuta: sudo bash install_libcamera.sh",
                             "Para USB: Verifica que la cámara esté conectada",
-                            "Asegúrate de que no esté siendo usada por otra aplicación"
+                            "Asegúrate de que no esté siendo usada por otra aplicación",
+                            "Ejecuta: ls /dev/video* para ver cámaras disponibles"
                         ]
                     })
             
