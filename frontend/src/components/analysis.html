@@ -132,7 +132,7 @@
 
                         <!-- RTSP Input and Analyze button -->
                         <div class="rtsp-input-group" style="display:flex; gap:8px; align-items:center; width:100%; margin-top:8px;">
-                            <input id="rtsp-url" type="text" placeholder="rtsp://usuario:password@ip:puerto/ruta" value="rtsp://172.31.30.154:8554/cam1" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd;">
+                            <input id="rtsp-url" type="text" placeholder="rtsp://usuario:password@ip:puerto/ruta" value="rtsp://172.31.30.179:8554/cam1" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd;">
                             <button class="btn btn-primary" onclick="analyzeFromRTSP()">
                                 <i class="fas fa-plug"></i> Analizar desde cámara (RTSP)
                             </button>
@@ -152,10 +152,13 @@
                             <button class="btn btn-success" onclick="captureFromLocalCamera()" style="flex:1;">
                                 <i class="fas fa-camera-retro"></i> Capturar y Analizar (Cámara Local)
                             </button>
+                            <button class="btn btn-warning" onclick="captureFromRaspberry()" style="flex:1;">
+                                <i class="fas fa-microchip"></i> Capturar con Raspberry (libcamera)
+                            </button>
                         </div>
                         <div class="camera-help" style="margin-top:4px; font-size:12px; color:#666;">
                             <i class="fas fa-info-circle"></i> 
-                            <span id="camera-help-text">USB: Cámaras conectadas por USB. Raspberry Pi: Camera Module oficial.</span>
+                            <span id="camera-help-text">USB: Cámaras conectadas por USB. Raspberry Pi: usa libcamera/raspistill para capturar con el Camera Module.</span>
                         </div>
                     </div>
                     

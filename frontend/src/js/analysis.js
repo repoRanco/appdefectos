@@ -170,6 +170,20 @@ function setupEventListeners() {
             closeModal();
         }
     });
+
+    // Update camera help text when camera type changes
+    const cameraTypeSelect = document.getElementById('camera-type');
+    if (cameraTypeSelect) {
+        cameraTypeSelect.addEventListener('change', function() {
+            const help = document.getElementById('camera-help-text');
+            if (!help) return;
+            if (this.value === 'raspberry') {
+                help.textContent = 'Raspberry Pi: usa libcamera/raspistill para capturar con el Camera Module.';
+            } else {
+                help.textContent = 'USB: Cámaras conectadas por USB. Raspberry Pi: usa libcamera/raspistill para capturar con el Camera Module.';
+            }
+        });
+    }
 }
 
 // Configurar validación de formulario
@@ -495,6 +509,22 @@ async function captureFromLocalCamera() {
             showNotification('Verifica que la cámara esté conectada y no esté siendo usada por otra aplicación', 'info');
         }
     }
+}
+
+// Capturar directamente usando Raspberry Pi (libcamera)
+async function captureFromRaspberry() {
+    const cameraTypeEl = document.getElementById('camera-type');
+    if (cameraTypeEl) {
+        cameraTypeEl.value = 'raspberry';
+        const event = new Event('change');
+        cameraTypeEl.dispatchEvent(event);
+    }
+    // Forzar índice 0 por defecto para Raspberry, si existe selector
+    const cameraIndexEl = document.getElementById('camera-index');
+    if (cameraIndexEl) {
+        cameraIndexEl.value = '0';
+    }
+    await captureFromLocalCamera();
 }
 
 // Analizar desde RTSP
@@ -1282,6 +1312,7 @@ window.onProfileChange = onProfileChange;
 window.analyzeImage = analyzeImage;
 window.analyzeFromRTSP = analyzeFromRTSP;
 window.captureFromLocalCamera = captureFromLocalCamera;
+window.captureFromRaspberry = captureFromRaspberry;
 window.goBack = goBack;
 window.goHome = goHome;
 window.goToHistory = goToHistory;
@@ -1617,6 +1648,7 @@ window.AnalysisApp.openLiveCamera = openLiveCamera;
 window.AnalysisApp.closeLiveCamera = closeLiveCamera;
 window.AnalysisApp.captureFromLiveCamera = captureFromLiveCamera;
 window.AnalysisApp.switchCamera = switchCamera;
+window.AnalysisApp.captureFromRaspberry = captureFromRaspberry;
 
 // Verificar soporte al cargar
 document.addEventListener('DOMContentLoaded', function() {
