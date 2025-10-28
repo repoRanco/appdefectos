@@ -150,21 +150,16 @@ def capture_with_raspberry_camera(
     ev=0.0
 ):
     """
-    Captura una foto con rpicam-still o libcamera-still a máxima calidad.
-    Detecta automáticamente cuál comando usar.
+    Captura una foto con rpicam-still a máxima calidad.
+    Solo funciona con Raspberry Pi moderno.
     """
     try:
-        # Detectar qué comando usar (rpicam-still es el nuevo, libcamera-still el antiguo)
-        cmd_name = None
-        for candidate in ["rpicam-still", "libcamera-still"]:
-            result = subprocess.run(["which", candidate], capture_output=True, text=True)
-            if result.returncode == 0:
-                cmd_name = candidate
-                break
+        # Verificar que rpicam-still está disponible
+        result = subprocess.run(["which", "rpicam-still"], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise FileNotFoundError("rpicam-still no está instalado")
         
-        if not cmd_name:
-            raise FileNotFoundError("No se encontró rpicam-still ni libcamera-still")
-        
+        cmd_name = "rpicam-still"
         print(f"🍓 Usando comando: {cmd_name}")
         
         # Crear archivo temporal
@@ -238,9 +233,9 @@ def capture_with_raspberry_camera(
         return img
 
     except FileNotFoundError:
-        print("❌ rpicam-still/libcamera-still no encontrado")
+        print("❌ rpicam-still no encontrado")
         raise RuntimeError(
-            "rpicam-still/libcamera-still no está instalado o no está en PATH. "
+            "rpicam-still no está instalado. "
             "Instala con: sudo apt install libcamera-apps"
         )
     except subprocess.TimeoutExpired:

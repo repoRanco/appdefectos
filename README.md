@@ -168,36 +168,37 @@ Si estás ejecutando el sistema en una Raspberry Pi y quieres capturar fotos dir
 
 3. **Verificar instalación**:
    ```bash
-   libcamera-still --version
+   rpicam-still --version
    # Debe mostrar la versión instalada
    ```
 
 4. **Probar la cámara**:
    ```bash
-   libcamera-hello
+   rpicam-hello
    # O capturar una foto de prueba:
-   libcamera-still -o test.jpg
+   rpicam-still -o test.jpg --immediate -n
    ```
 
 ### Usar en la aplicación
 
 Una vez instalado libcamera, al seleccionar "Capturar con Raspberry (libcamera)" en la página de análisis:
 
-- El sistema intentará usar `rpicam-still` (moderno) o `libcamera-still` (legacy) para capturar la foto
-- Si ninguno está disponible, usará OpenCV como alternativa automática
-- Captura a calidad 100 con configuración optimizada
+- El sistema usará `rpicam-still` para capturar la foto directamente desde la Raspberry Pi Camera Module
+- Captura a calidad 100 con configuración optimizada (denoise, sharpness, contrast, saturation)
+- Usa configuración inmediata sin preview para máxima velocidad
 
 ## 🚨 Solución de Problemas
 
-### Error: libcamera-still no encontrado
+### Error: rpicam-still no encontrado
 ```
-⚠️ libcamera-still no encontrado
-ℹ️ libcamera-apps no está instalado. Instala con: sudo apt install libcamera-apps
+❌ rpicam-still no encontrado
+rpicam-still no está instalado. Instala con: sudo apt install libcamera-apps
 ```
 **Solución**: 
 - Instalar libcamera-apps: `sudo apt install libcamera-apps`
 - O usar el script: `sudo bash install_libcamera.sh`
 - Luego reiniciar si es necesario
+- Verificar con: `which rpicam-still`
 
 ### Error: Cámara no detectada en Raspberry Pi
 ```
