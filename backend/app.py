@@ -9,6 +9,8 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 import time
 from dotenv import load_dotenv
+import subprocess
+import tempfile
 
 # Importar funciones de base de datos
 from database import (
@@ -132,6 +134,121 @@ def load_zones(profile="qc_recepcion", distribucion="roja"):
 
 # Las zonas se cargarán dinámicamente en cada análisis
 zones = {}
+
+def capture_with_raspberry_camera(
+    resolution="max",
+    timeout_ms=1200,
+    quality=100,
+    denoise="cdn_off",
+    sharpness=1.5,
+    contrast=1.2,
+    saturation=1.05,
+    awb="auto",
+    awbgains=None,
+    exposure="normal",
+    iso=None,
+    ev=0.0
+):
+    """
+    Captura una foto con rpicam-still o libcamera-still a máxima calidad.
+    Detecta automáticamente cuál comando usar.
+    """
+    try:
+        # Detectar qué comando usar (rpicam-still es el nuevo, libcamera-still el antiguo)
+        cmd_name = None
+        for candidate in ["rpicam-still", "libcamera-still"]:
+            result = subprocess.run(["which", candidate], capture_output=True, text=True)
+            if result.returncode == 0:
+                cmd_name = candidate
+                break
+        
+        if not cmd_name:
+            raise FileNotFoundError("No se encontró rpicam-still ni libcamera-still")
+        
+        print(f"🍓 Usando comando: {cmd_name}")
+        
+        # Crear archivo temporal
+        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
+            tmp_path = temp_file.name
+
+        # Comando base
+        cmd = [
+            cmd_name,
+            "--immediate",
+            f"--timeout={int(timeout_ms)}",
+            f"--quality={int(quality)}",
+            f"--denoise={denoise}",
+            f"--sharpness={sharpness}",
+            f"--contrast={contrast}",
+            f"--saturation={saturation}",
+            f"--awb={awb}",
+            f"--exposure={exposure}",
+            "-n",  # sin preview
+            "-o", tmp_path
+        ]
+
+        # Resolución
+        if isinstance(resolution, str) and resolution.lower() != "max":
+            if "x" in resolution:
+                w, h = resolution.lower().split("x")
+                cmd += [f"--width={int(w)}", f"--height={int(h)}"]
+
+        # ISO / EV
+        if iso is not None:
+            cmd += [f"--gain={float(iso)/100}"]
+        if ev is not None:
+            cmd += [f"--ev={float(ev)}"]
+        if awbgains:
+            cmd += ["--awbgains", str(awbgains)]
+
+        print(f"🍓 Ejecutando: {' '.join(cmd)}")
+        
+        # Ejecutar comando
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False
+        )
+        
+        # Verificar resultado
+        if result.returncode != 0:
+            error_msg = result.stderr.strip() if result.stderr else "Error desconocido"
+            print(f"❌ {cmd_name} falló (código {result.returncode}): {error_msg}")
+            raise RuntimeError(f"{cmd_name} error: {error_msg}")
+
+        # Verificar que el archivo existe
+        if not os.path.exists(tmp_path):
+            raise RuntimeError(f"{cmd_name} no generó el archivo de imagen")
+
+        # Leer imagen con OpenCV
+        img = cv2.imread(tmp_path)
+        
+        # Limpiar archivo temporal
+        try:
+            os.unlink(tmp_path)
+        except Exception as e:
+            print(f"⚠️ No se pudo eliminar archivo temporal: {e}")
+
+        if img is None:
+            raise RuntimeError(f"No se pudo leer la imagen capturada por {cmd_name}")
+
+        print(f"✅ Imagen capturada exitosamente: {img.shape[1]}x{img.shape[0]}")
+        return img
+
+    except FileNotFoundError:
+        print("❌ rpicam-still/libcamera-still no encontrado")
+        raise RuntimeError(
+            "rpicam-still/libcamera-still no está instalado o no está en PATH. "
+            "Instala con: sudo apt install libcamera-apps"
+        )
+    except subprocess.TimeoutExpired:
+        print("❌ Timeout capturando imagen")
+        raise RuntimeError("Timeout capturando imagen (>15s)")
+    except Exception as e:
+        print(f"❌ Error inesperado: {e}")
+        raise
 
 def resize_image_to_standard(img, target_size=(1920, 1080)):
     """Redimensiona la imagen a resolución estándar 1920x1080"""
@@ -769,7 +886,7 @@ def capture_local_camera():
         profile = data.get('profile', 'qc_recepcion')
         distribucion = data.get('distribucion', 'roja')
         camera_type = data.get('camera_type', 'usb')  # 'usb' o 'raspberry'
-        camera_index = int(data.get('camera_index', 0))  # Índice de cámara (0 = predeterminada)
+        camera_index = int(data.get('camera_index', 0))
         
         # Cargar zonas dinámicamente según perfil y distribución
         zones = load_zones(profile, distribucion)
@@ -780,133 +897,64 @@ def capture_local_camera():
         
         frame = None
         
-        # Intentar captura con Raspberry Pi Camera Module primero
-        if camera_type == 'raspberry':
+        # 1) Captura con Raspberry Pi Camera Module
+        if camera_type in ('raspberry', 'libcamera'):
             try:
-                print("🍓 Intentando captura con Raspberry Pi Camera Module...")
-                
-                # Importar módulos necesarios
-                import subprocess
-                import tempfile
-                
-                # Crear archivo temporal
-                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
-                    temp_path = temp_file.name
-                
-                # Intentar con rpicam-still (nuevo) o libcamera-still (antiguo)
-                cmd_name = None
-                for candidate in ["rpicam-still", "libcamera-still"]:
-                    result = subprocess.run(["which", candidate], capture_output=True, text=True)
-                    if result.returncode == 0:
-                        cmd_name = candidate
-                        break
-                
-                if not cmd_name:
-                    print("⚠️ No se encontró rpicam-still ni libcamera-still")
-                    print("ℹ️ Intentando captura con OpenCV como alternativa...")
-                else:
-                    print(f"🍓 Usando comando: {cmd_name}")
-                    
-                    # Comando para capturar
-                    cmd = [
-                        cmd_name,
-                        '--immediate',
-                        f'--timeout=1200',
-                        '--quality=100',
-                        '--denoise=cdn_off',
-                        '--nopreview',
-                        '-o', temp_path
-                    ]
-                    
-                    try:
-                        print(f"🍓 Ejecutando: {' '.join(cmd)}")
-                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-                        
-                        if result.returncode == 0:
-                            # Verificar que el archivo existe
-                            if os.path.exists(temp_path):
-                                # Leer imagen con OpenCV
-                                frame = cv2.imread(temp_path)
-                                if frame is not None:
-                                    print(f"✅ Captura exitosa con {cmd_name}: {frame.shape[1]}x{frame.shape[0]}")
-                                os.unlink(temp_path)
-                            else:
-                                print(f"⚠️ {cmd_name} no generó archivo")
-                        else:
-                            error_msg = result.stderr.strip() if result.stderr else "Error desconocido"
-                            print(f"⚠️ {cmd_name} falló (código {result.returncode}): {error_msg}")
-                            print("ℹ️ Intentando captura con OpenCV como alternativa...")
-                    except subprocess.TimeoutExpired:
-                        print("⚠️ Timeout en captura con rpi/libcamera")
-                        print("ℹ️ Intentando captura con OpenCV como alternativa...")
-                    except Exception as e:
-                        print(f"⚠️ Error con {cmd_name}: {e}")
-                        print("ℹ️ Intentando captura con OpenCV como alternativa...")
-                
+                print("🍓 Capturando con Raspberry Pi Camera Module...")
+                frame = capture_with_raspberry_camera(
+                    resolution="max",
+                    timeout_ms=1200,
+                    quality=100,
+                    denoise="cdn_off",
+                    sharpness=1.5,
+                    contrast=1.2,
+                    saturation=1.05,
+                    awb="auto",
+                    exposure="normal"
+                )
+                print(f"✅ Captura Raspberry Pi exitosa: {frame.shape}")
             except Exception as e:
-                print(f"⚠️ Error en captura Raspberry Pi: {e}")
-                print("ℹ️ Intentando captura con OpenCV como alternativa...")
+                print(f"❌ Error en Raspberry Pi Camera: {e}")
+                return jsonify({
+                    "success": False,
+                    "error": f"Error capturando con Raspberry Pi Camera: {str(e)}",
+                    "suggestions": [
+                        "Verifica que libcamera-apps esté instalado: sudo apt install libcamera-apps",
+                        "Habilita la cámara: sudo raspi-config → Interface Options → Camera",
+                        "Prueba manualmente: rpicam-still -o test.jpg --immediate -n",
+                        "Reinicia la Raspberry Pi si acabas de habilitar la cámara"
+                    ]
+                }), 500
         
-        # Si no se pudo capturar con Raspberry Pi o es cámara USB, usar OpenCV
-        if frame is None:
-            print("🔄 Intentando captura con OpenCV...")
-            
-            # Si camera_type es raspberry, forzar índice 0
-            opencv_index = 0 if camera_type == 'raspberry' else camera_index
-            
-            # Intentar abrir cámara local con OpenCV
-            cap = cv2.VideoCapture(opencv_index)
-            
+        # 2) Fallback a USB con OpenCV
+        elif camera_type == 'usb':
+            print(f"🎥 Capturando desde cámara USB index={camera_index}...")
+            cap = cv2.VideoCapture(camera_index)
             if not cap.isOpened():
-                # Intentar con diferentes índices si el especificado falla
-                print(f"⚠️ No se pudo abrir cámara en índice {opencv_index}, probando otros...")
-                found_camera = False
-                for i in range(3):  # Probar índices 0, 1, 2
-                    if i == opencv_index:
-                        continue  # Ya probamos este
-                    cap = cv2.VideoCapture(i)
-                    if cap.isOpened():
-                        opencv_index = i
-                        camera_index = i
-                        print(f"✅ Cámara OpenCV encontrada en índice: {i}")
-                        found_camera = True
-                        break
-                    cap.release()
-                
-                if not found_camera:
-                    return jsonify({
-                        "success": False,
-                        "error": "No se pudo acceder a ninguna cámara",
-                        "suggestions": [
-                            "Para Raspberry Pi: Verifica que la cámara esté habilitada con 'sudo raspi-config'",
-                            "Para Raspberry Pi: Instala libcamera-tools: 'sudo apt install libcamera-apps'",
-                            "Para Raspberry Pi: Ejecuta: sudo bash install_libcamera.sh",
-                            "Para USB: Verifica que la cámara esté conectada",
-                            "Asegúrate de que no esté siendo usada por otra aplicación",
-                            "Ejecuta: ls /dev/video* para ver cámaras disponibles"
-                        ]
-                    })
+                return jsonify({
+                    "success": False,
+                    "error": f"No se pudo abrir cámara USB {camera_index}"
+                }), 400
             
-            # Configurar resolución de cámara
+            # Configurar resolución
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
             
-            # Capturar frame
-            ret, frame = cap.read()
+            time.sleep(0.25)
+            ok, frame = cap.read()
             cap.release()
             
-            if not ret or frame is None:
+            if not ok or frame is None:
                 return jsonify({
                     "success": False,
-                    "error": "No se pudo capturar imagen de la cámara",
-                    "suggestions": [
-                        "Verifica que la cámara esté funcionando correctamente",
-                        "Para Raspberry Pi: Prueba 'libcamera-hello' para verificar la cámara",
-                        "Prueba cerrar otras aplicaciones que puedan estar usando la cámara"
-                    ]
-                })
-            
-            print("✅ Captura exitosa con OpenCV")
+                    "error": "No se pudo capturar frame desde USB"
+                }), 400
+        
+        if frame is None:
+            return jsonify({
+                "success": False,
+                "error": "No se pudo capturar imagen"
+            }), 400
         
         print(f"📐 Imagen capturada: {frame.shape[1]}x{frame.shape[0]}")
         
@@ -1014,11 +1062,11 @@ def test_rtsp():
         # Configurar opciones más agresivas para test
         ffmpeg_options = [
             "rtsp_transport;tcp",
-            "stimeout;5000000",            # 5 segundos timeout para test
-            "max_delay;100000",            # Buffer mínimo
-            "buffer_size;16384",           # Buffer muy pequeño
-            "analyzeduration;500000",      # 0.5 segundos análisis
-            "probesize;16384",             # Probe size mínimo
+            "stimeout;5000000",
+            "max_delay;100000",
+            "buffer_size;16384",
+            "analyzeduration;500000",
+            "probesize;16384",
             "fflags;nobuffer"
         ]
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "|".join(ffmpeg_options)
@@ -1047,7 +1095,7 @@ def test_rtsp():
         frame_captured = False
         frame_info = {}
         
-        for i in range(10):  # Máximo 10 intentos
+        for i in range(10):
             ret, frame = cap.read()
             if ret and frame is not None:
                 frame_captured = True
@@ -1125,35 +1173,16 @@ def analyze_rtsp():
             return jsonify({"success": False, "error": "No se pudieron cargar las zonas"})
 
         confidence = 0.8
-        timeout_sec = float(data.get('timeout_sec', 12))  # subir timeout por redes Wi‑Fi
+        timeout_sec = float(data.get('timeout_sec', 12))
         warmup_frames = int(data.get('warmup_frames', 8))
         retries = int(data.get('retries', 2))
         use_gstreamer = bool(data.get('use_gstreamer', False))
         
         # Parámetros para manejar cámaras de alta resolución
-        max_resolution = data.get('max_resolution', '1920x1080')  # Resolución máxima deseada
-        auto_resize = data.get('auto_resize', True)  # Auto-redimensionar para cámaras de alta resolución
+        max_resolution = data.get('max_resolution', '1920x1080')
+        auto_resize = data.get('auto_resize', True)
 
-        # Configurar opciones de FFmpeg para RTSP con manejo robusto de errores H.264
-        # Opciones específicas para manejar corrupción de stream y errores de decodificación
-        ffmpeg_options = [
-            "rtsp_transport;tcp",           # Forzar TCP para evitar pérdida de paquetes UDP
-            "stimeout;15000000",           # 15 segundos timeout (aumentado para streams problemáticos)
-            "max_delay;1000000",           # 1 segundo jitter buffer (aumentado)
-            "buffer_size;65536",           # Buffer más grande para manejar variaciones
-            "analyzeduration;2000000",     # 2 segundos análisis (más tiempo para streams corruptos)
-            "probesize;65536",             # Probe size más grande
-            "fflags;nobuffer+discardcorrupt", # Sin buffering + descartar frames corruptos
-            "flags;low_delay",             # Baja latencia
-            "err_detect;ignore_err",       # Ignorar errores menores de decodificación
-            "skip_frame;nokey"             # Saltar frames no-key si hay problemas
-        ]
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "|".join(ffmpeg_options)
-
-        last_error = None
-        img = None
-
-        # Configuraciones progresivamente más tolerantes para streams problemáticos
+        # Configuraciones progresivamente más tolerantes
         rtsp_configs = [
             {
                 "name": "Configuración Estándar",
@@ -1202,10 +1231,12 @@ def analyze_rtsp():
             }
         ]
 
+        last_error = None
+        img = None
+
         for attempt in range(retries + 1):
             print(f"📡 Intento {attempt+1}/{retries+1} conectando RTSP: {rtsp_url}")
             
-            # Usar configuración progresivamente más tolerante
             config_index = min(attempt, len(rtsp_configs) - 1)
             current_config = rtsp_configs[config_index]
             
@@ -1213,7 +1244,6 @@ def analyze_rtsp():
             os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "|".join(current_config['options'])
 
             if use_gstreamer:
-                # Pipeline GStreamer para RTSP H264 por TCP (requiere OpenCV con GStreamer)
                 pipeline = (
                     f"rtspsrc location={rtsp_url} protocols=tcp latency=0 ! "
                     "rtph264depay ! h264parse config-interval=-1 ! "
@@ -1227,10 +1257,10 @@ def analyze_rtsp():
             if not cap.isOpened():
                 last_error = "No se pudo abrir el stream RTSP"
                 print(f"⚠️  {last_error}")
-                time.sleep(2.0)  # Espera más larga entre intentos
+                time.sleep(2.0)
                 continue
 
-            # Configurar resolución si es posible (para cámaras de alta resolución)
+            # Configurar resolución si es posible
             if auto_resize and max_resolution:
                 try:
                     max_width, max_height = map(int, max_resolution.split('x'))
@@ -1240,10 +1270,9 @@ def analyze_rtsp():
                 except Exception as e:
                     print(f"⚠️ No se pudo configurar resolución: {e}")
 
-            # Configuraciones adicionales para manejar streams corruptos
             try:
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                cap.set(cv2.CAP_PROP_FPS, 15)  # Limitar FPS para reducir carga
+                cap.set(cv2.CAP_PROP_FPS, 15)
             except Exception:
                 pass
 
@@ -1252,27 +1281,22 @@ def analyze_rtsp():
             valid_frames = 0
             img = None
 
-            # Intentar capturar múltiples frames y usar el mejor
             while time.time() - start_time < timeout_sec:
                 try:
                     ok, frame = cap.read()
                     if ok and frame is not None:
                         frames_read += 1
                         
-                        # Validar que el frame no esté completamente corrupto
-                        if frame.shape[0] > 100 and frame.shape[1] > 100:  # Tamaño mínimo razonable
-                            # Verificar que no sea completamente negro o blanco
+                        if frame.shape[0] > 100 and frame.shape[1] > 100:
                             mean_val = np.mean(frame)
-                            if 10 < mean_val < 245:  # Rango razonable de intensidad
+                            if 10 < mean_val < 245:
                                 valid_frames += 1
                                 img = frame
                                 
-                                # Si tenemos suficientes frames válidos, usar este
                                 if valid_frames >= max(1, warmup_frames // 2):
                                     print(f"✅ Frame válido capturado (intento {valid_frames})")
                                     break
                         
-                        # Si hemos leído muchos frames sin éxito, continuar
                         if frames_read > warmup_frames * 2:
                             break
                             
@@ -1281,7 +1305,6 @@ def analyze_rtsp():
                     time.sleep(0.05)
                     continue
                 
-                # Espera corta para no bloquear CPU
                 time.sleep(0.02)
 
             cap.release()
@@ -1299,11 +1322,11 @@ def analyze_rtsp():
                 "success": False,
                 "error": last_error or "No se pudo capturar frame del RTSP",
                 "hints": [
-                    "Verifica la URL y que el puerto 8554 esté accesible desde este host",
-                    "Prueba en VLC/ffplay: usa transporte TCP",
-                    "Si usas MediaMTX, valida que la ruta /cam1 exista y esté publicando",
-                    "Puedes llamar con use_gstreamer=true si tienes GStreamer instalado",
-                    "Para cámaras de 12MP, usa max_resolution='1920x1080' para mejor rendimiento"
+                    "Verifica la URL y que el puerto 8554 esté accesible",
+                    "Prueba en VLC/ffplay con transporte TCP",
+                    "Si usas MediaMTX, valida que la ruta exista",
+                    "Puedes usar use_gstreamer=true si tienes GStreamer",
+                    "Para cámaras de 12MP, usa max_resolution='1920x1080'"
                 ]
             }), 504
 
@@ -1311,15 +1334,13 @@ def analyze_rtsp():
         original_height, original_width = img.shape[:2]
         print(f"📐 Imagen RTSP original: {original_width}x{original_height}")
         
-        # Auto-redimensionar si la imagen es demasiado grande (cámaras de alta resolución)
+        # Auto-redimensionar si es necesario
         if auto_resize and max_resolution:
             max_width, max_height = map(int, max_resolution.split('x'))
             
-            # Si la imagen es significativamente más grande que la resolución máxima
             if original_width > max_width * 1.5 or original_height > max_height * 1.5:
-                print(f"🔄 Redimensionando imagen de alta resolución: {original_width}x{original_height} -> {max_width}x{max_height}")
+                print(f"🔄 Redimensionando: {original_width}x{original_height} -> {max_width}x{max_height}")
                 
-                # Calcular ratio manteniendo aspecto
                 ratio = min(max_width / original_width, max_height / original_height)
                 new_width = int(original_width * ratio)
                 new_height = int(original_height * ratio)
@@ -1327,50 +1348,41 @@ def analyze_rtsp():
                 img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
                 print(f"✅ Imagen redimensionada a: {new_width}x{new_height}")
 
-        # Guardar imagen original capturada (sin procesamiento)
+        # Guardar imagen original
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         original_filename = f"capture_{timestamp}_rtsp_original.jpg"
         original_path = os.path.join("static", original_filename)
         cv2.imwrite(original_path, img)
         print(f"📁 Imagen original RTSP guardada: {original_path}")
 
-        # Ejecutar el modelo
+        # Ejecutar modelo
         results = model.predict(img, conf=confidence, verbose=False)
 
         zone_counts = {name: 0 for name in zones.keys()}
         total_detections = 0
         detections_by_zone = {}
 
-        # Obtener dimensiones de la imagen RTSP
         img_height, img_width = img.shape[:2]
         img_size = (img_width, img_height)
+        zones_reference_size = (1280, 720)
         
-        # Las zonas fueron creadas en una imagen de 1280x720, usar esto como referencia
-        zones_reference_size = (1280, 720)  # Tamaño real donde se crearon las zonas
-        
-        # Calcular el factor de escala basado en el tamaño real de referencia
         scale_factor_x = img_width / 1280
         scale_factor_y = img_height / 720
         avg_scale_factor = (scale_factor_x + scale_factor_y) / 2
         
         print(f"📐 Tamaño de imagen RTSP: {img_width}x{img_height}")
-        print(f"📏 Tamaño de referencia de zonas: {zones_reference_size}")
         print(f"📏 Factor de escala promedio: {avg_scale_factor:.2f}")
         
-        # Siempre escalar las zonas desde 1280x720 al tamaño actual de la imagen
-        if abs(avg_scale_factor - 1.0) > 0.1:  # Si hay diferencia significativa
+        if abs(avg_scale_factor - 1.0) > 0.1:
             scaled_zones_for_drawing = scale_zones_to_image(zones, zones_reference_size, img_size)
             print(f"🔄 Escalando zonas desde {zones_reference_size} a {img_size}")
-            print(f"📏 Factores de escala: X={scale_factor_x:.3f}, Y={scale_factor_y:.3f}")
         else:
-            # La imagen tiene un tamaño muy similar a 1280x720, usar zonas sin escalar
             scaled_zones_for_drawing = zones
-            print(f"✅ Tamaño similar a referencia (1280x720), usando zonas sin escalar")
+            print(f"✅ Usando zonas sin escalar")
  
         if len(results[0].boxes) > 0:
-            # Filtrar detecciones duplicadas
             filtered_boxes = remove_duplicate_detections(results[0].boxes, min_distance=50)
-            print(f"🔄 Detecciones RTSP después de filtrar duplicados: {len(filtered_boxes)}")
+            print(f"🔄 Detecciones RTSP: {len(filtered_boxes)}")
             
             for i, box in enumerate(filtered_boxes):
                 try:
@@ -1378,10 +1390,11 @@ def analyze_rtsp():
                     conf_score = float(box.conf[0])
                     if conf_score < confidence:
                         continue
-                    # Determinar zona usando escalado apropiado
+                    
                     zone_name = assign_zone(bbox, zones, img_size, zones_reference_size)
                     if zone_name == "Sin clasificar":
                         continue
+                    
                     zone_counts[zone_name] += 1
                     if zone_name not in detections_by_zone:
                         detections_by_zone[zone_name] = []
@@ -1391,7 +1404,6 @@ def analyze_rtsp():
                     print(f"❌ Error procesando detección {i}: {e}")
                     continue
             
-            # Usar las detecciones filtradas para el dibujo
             results[0].boxes = filtered_boxes
 
         processed_img = draw_zones_and_detections(
@@ -1401,7 +1413,6 @@ def analyze_rtsp():
             confidence_threshold=confidence
         )
 
-        # Guardar imagen procesada (con análisis)
         processed_filename = f"analysis_{timestamp}_rtsp_conf80.jpg"
         processed_path = os.path.join("static", processed_filename)
         cv2.imwrite(processed_path, processed_img)
@@ -1427,7 +1438,7 @@ def analyze_rtsp():
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)})
 
-# Nuevos endpoints para base de datos e historial
+# Endpoints de base de datos
 @app.route('/get_analysis_history', methods=['GET'])
 def get_analysis_history_endpoint():
     """Obtener historial de análisis"""
@@ -1451,10 +1462,8 @@ def get_analysis_history_endpoint():
 
 @app.route('/sync_pending_data', methods=['POST'])
 def sync_pending_data_endpoint():
-    """Sincronizar datos pendientes del caché local a PostgreSQL"""
+    """Sincronizar datos pendientes"""
     try:
-        user_name = request.json.get('user_name') if request.json else None
-        
         result = sync_pending_data()
         
         return jsonify({
@@ -1469,10 +1478,9 @@ def sync_pending_data_endpoint():
 
 @app.route('/get_local_history', methods=['GET'])
 def get_local_history_endpoint():
-    """Obtener historial del caché local"""
+    """Obtener historial local"""
     try:
         limit = int(request.args.get('limit', 50))
-        
         history = get_local_history(limit)
         
         return jsonify({
@@ -1488,7 +1496,7 @@ def get_local_history_endpoint():
 
 @app.route('/database_status', methods=['GET'])
 def database_status():
-    """Verificar estado de conexión a la base de datos"""
+    """Verificar estado de base de datos"""
     try:
         connection_ok, message = test_db_connection()
         
@@ -1500,7 +1508,7 @@ def database_status():
         })
         
     except Exception as e:
-        print(f"❌ Error verificando estado de base de datos: {e}")
+        print(f"❌ Error verificando base de datos: {e}")
         return jsonify({
             "success": False,
             "error": str(e),
@@ -1510,13 +1518,11 @@ def database_status():
 
 @app.route('/clear_local_cache', methods=['POST'])
 def clear_local_cache():
-    """Limpiar caché local (solo registros sincronizados)"""
+    """Limpiar caché local"""
     try:
         from database import get_local_session, LocalCache
         
         local_db = get_local_session()
-        
-        # Solo eliminar registros que ya fueron sincronizados
         synced_records = local_db.query(LocalCache)\
             .filter(LocalCache.status == 'synced')\
             .all()
@@ -1531,16 +1537,16 @@ def clear_local_cache():
         
         return jsonify({
             "success": True,
-            "message": f"Se eliminaron {count} registros sincronizados del caché local"
+            "message": f"Se eliminaron {count} registros sincronizados"
         })
         
     except Exception as e:
-        print(f"❌ Error limpiando caché local: {e}")
+        print(f"❌ Error limpiando caché: {e}")
         return jsonify({"success": False, "error": str(e)})
 
 @app.route('/force_upload_analysis', methods=['POST'])
 def force_upload_analysis():
-    """Forzar subida de análisis a PostgreSQL desde el frontend"""
+    """Forzar subida a PostgreSQL"""
     try:
         data = request.get_json()
         
@@ -1551,19 +1557,18 @@ def force_upload_analysis():
         form_data = data.get('form_data', {})
         results_data = data.get('results_data', {})
         
-        # Guardar directamente en PostgreSQL
         analysis_id, success = save_analysis_result(analysis_data, form_data, results_data)
         
         if success:
             return jsonify({
                 "success": True,
                 "analysis_id": analysis_id,
-                "message": "Análisis subido exitosamente a PostgreSQL"
+                "message": "Análisis subido exitosamente"
             })
         else:
             return jsonify({
                 "success": False,
-                "error": "No se pudo subir a PostgreSQL, guardado en caché local",
+                "error": "No se pudo subir, guardado en caché local",
                 "cache_id": analysis_id
             })
             
@@ -1573,7 +1578,7 @@ def force_upload_analysis():
 
 @app.route('/save_to_cache', methods=['POST'])
 def save_to_cache_endpoint():
-    """Guardar análisis específicamente en caché local"""
+    """Guardar en caché local"""
     try:
         data = request.get_json()
         
@@ -1584,19 +1589,18 @@ def save_to_cache_endpoint():
         form_data = data.get('form_data', {})
         results_data = data.get('results_data', {})
         
-        # Guardar solo en caché local
         cache_id, success = save_to_local_cache(analysis_data, form_data, results_data)
         
         if cache_id:
             return jsonify({
                 "success": True,
                 "cache_id": cache_id,
-                "message": "Análisis guardado en caché local para sincronización posterior"
+                "message": "Guardado en caché local"
             })
         else:
             return jsonify({
                 "success": False,
-                "error": "No se pudo guardar en caché local"
+                "error": "No se pudo guardar en caché"
             })
             
     except Exception as e:
@@ -1619,10 +1623,9 @@ if __name__ == '__main__':
         print(f"⚠️ Error inicializando base de datos: {e}")
         print("📁 Continuando con SQLite local")
     
-    # Nota: las zonas se cargan dinámicamente ahora
     print("🌐 Accede a: http://localhost:5001")
     
-    # Verificar que el modelo existe
+    # Verificar modelo
     if os.path.exists(MODEL_PATH):
         print(f"✅ Modelo YOLO encontrado: {MODEL_PATH}")
     else:
