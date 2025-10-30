@@ -72,71 +72,60 @@ document.addEventListener('DOMContentLoaded', function() {
 // Manejar el login
 async function handleLogin(e) {
     e.preventDefault();
-    
+  
     const usuario = document.getElementById('usuario').value.trim();
     const password = document.getElementById('password').value;
     const loginBtn = document.querySelector('.login-btn');
     const loadingOverlay = document.getElementById('loadingOverlay');
-    
-    // Validaciones básicas
-    if (!usuario || !password) {
-        showError('Por favor, complete todos los campos');
-        return;
-    }
-    
-    if (!isValidEmail(usuario)) {
-        showError('Por favor, ingrese un email válido');
-        return;
-    }
-    
-    // Mostrar loading
+  
+    if (!usuario || !password) { showError('Por favor, complete todos los campos'); return; }
+    if (!isValidEmail(usuario)) { showError('Por favor, ingrese un email válido'); return; }
+  
     loginBtn.classList.add('loading');
     loadingOverlay.style.display = 'flex';
-    
+  
     try {
-        // Simular delay de autenticación
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Verificar credenciales
-        const user = USERS[usuario.toLowerCase()];
-        
-        if (!user || user.password !== password) {
-            throw new Error('Credenciales incorrectas');
-        }
-        
-        // Login exitoso
-        loginBtn.classList.remove('loading');
-        loginBtn.classList.add('success');
-        loginBtn.innerHTML = '<i class="fas fa-check"></i> ¡Bienvenido!';
-        
-        // Guardar sesión
-        const sessionData = {
-            email: usuario,
-            name: user.name,
-            role: user.role,
-            facility: user.facility,
-            module: user.module,
-            loginTime: new Date().toISOString()
-        };
-        
-        localStorage.setItem('rancoqc_user', JSON.stringify(sessionData));
-        
-        // Redirigir después de un momento
-        setTimeout(() => {
-            loadingOverlay.style.display = 'none';
-            redirectToMain();
-        }, 1000);
-        
-    } catch (error) {
-        loginBtn.classList.remove('loading');
+      // Autenticar contra el backend
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',         // IMPORTANTE: envía/recibe cookie de sesión
+        body: JSON.stringify({ username: usuario, password })
+      });
+  
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Credenciales incorrectas');
+      }
+  
+      const data = await res.json(); // { success, role, is_admin }
+  
+      // Opcional: info para UI (puedes mapear role→module/facility si lo necesitas)
+      const sessionData = {
+        email: usuario,
+        role: data.role,
+        is_admin: data.is_admin,
+        loginTime: new Date().toISOString()
+      };
+      localStorage.setItem('rancoqc_user', JSON.stringify(sessionData));
+  
+      loginBtn.classList.remove('loading');
+      loginBtn.classList.add('success');
+      loginBtn.innerHTML = '<i class="fas fa-check"></i> ¡Bienvenido!';
+  
+      setTimeout(() => {
         loadingOverlay.style.display = 'none';
-        showError(error.message || 'Error al iniciar sesión');
-        
-        // Limpiar contraseña
-        document.getElementById('password').value = '';
-        document.getElementById('password').focus();
+        redirectToMain();
+      }, 600);
+  
+    } catch (error) {
+      loginBtn.classList.remove('loading');
+      loadingOverlay.style.display = 'none';
+      showError(error.message || 'Error al iniciar sesión');
+      document.getElementById('password').value = '';
+      document.getElementById('password').focus();
     }
-}
+  }
 
 // Validar email
 function isValidEmail(email) {

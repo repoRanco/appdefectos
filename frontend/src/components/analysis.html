@@ -4,8 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RancoQC - Análisis de Cerezas</title>
+    <link rel="stylesheet" href="../styles/main.css">   
     <link rel="stylesheet" href="../styles/analysis.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Estilos adicionales para el modal de nuevo defecto */
+        .new-defect-section {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            border: 1px solid #dee2e6;
+        }
+        .text-muted {
+            color: #6c757d;
+            font-size: 12px;
+            display: block;
+            margin-top: 4px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #333;
+        }
+        .form-group input[type="checkbox"] {
+            margin-right: 6px;
+        }
+        .new-defect-hint {
+            background: #e7f3ff;
+            padding: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #0066cc;
+            margin-top: 8px;
+        }
+    </style>
 </head>
 <body>
     <div class="analysis-container">
@@ -116,46 +149,18 @@
                     
                     <!-- Upload Options -->
                     <div class="upload-options">
-                        <label class="btn btn-secondary upload-btn">
-                            <i class="fas fa-folder-open"></i> Subir desde archivos
-                            <input type="file" id="file-input" accept="image/*" style="display:none;">
-                        </label>
-
-                        <button class="btn btn-primary upload-btn" onclick="openLiveCamera()">
-                            <i class="fas fa-video"></i> Cámara en vivo
+                        <button class="btn btn-warning upload-btn" onclick="openManualEntry()">
+                            <i class="fas fa-edit"></i> Ingreso Manual
                         </button>
-
-                        <label class="btn btn-success upload-btn">
-                            <i class="fas fa-camera"></i> Capturar con cámara
-                            <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;">
-                        </label>
 
                         <!-- RTSP Input and Analyze button -->
                         <div class="rtsp-input-group" style="display:flex; gap:8px; align-items:center; width:100%; margin-top:8px;">
                             <input id="rtsp-url" type="text" placeholder="rtsp://usuario:password@ip:puerto/ruta" value="rtsp://172.31.30.179:8554/cam1" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd;">
                             <button class="btn btn-primary" onclick="analyzeFromRTSP()">
-                                <i class="fas fa-plug"></i> Analizar desde cámara (RTSP)
+                                <i class="fas fa-plug"></i> Realizar Analisis
                             </button>
                         </div>
 
-                        <!-- Local Camera Capture button -->
-                        <div class="local-camera-group" style="display:flex; gap:8px; align-items:center; width:100%; margin-top:8px;">
-                            <select id="camera-type" style="flex:0.25; padding:10px; border-radius:8px; border:1px solid #ddd;">
-                                <option value="usb">USB</option>
-                                <option value="raspberry">Raspberry Pi</option>
-                            </select>
-                            <select id="camera-index" style="flex:0.25; padding:10px; border-radius:8px; border:1px solid #ddd;">
-                                <option value="0">Cámara 0</option>
-                                <option value="1">Cámara 1</option>
-                                <option value="2">Cámara 2</option>
-                            </select>
-                            <button class="btn btn-success" onclick="captureFromLocalCamera()" style="flex:1;">
-                                <i class="fas fa-camera-retro"></i> Capturar y Analizar (Cámara Local)
-                            </button>
-                            <button class="btn btn-warning" onclick="captureFromRaspberry()" style="flex:1;">
-                                <i class="fas fa-microchip"></i> Capturar con Raspberry (libcamera)
-                            </button>
-                        </div>
                         <div class="camera-help" style="margin-top:4px; font-size:12px; color:#666;">
                             <i class="fas fa-info-circle"></i> 
                             <span id="camera-help-text">USB: Cámaras conectadas por USB. Raspberry Pi: usa libcamera/raspistill para capturar con el Camera Module.</span>
@@ -221,12 +226,17 @@
 
                 <!-- Defects List -->
                 <div class="defects-container">
-                    <h3><i class="fas fa-list-ul"></i> Defectos Detectados</h3>
+                    <div class="defects-header">
+                        <h3><i class="fas fa-list-ul"></i> Defectos Detectados</h3>
+                        <button class="btn btn-add-defect" onclick="addManualDefect()" title="Agregar defecto manualmente">
+                            <i class="fas fa-plus"></i> Agregar Defecto Manual
+                        </button>
+                    </div>
                     <div class="defects-list" id="defects-list">
                         <!-- Los resultados se llenan dinámicamente -->
                     </div>
                 </div>
-
+                
                 <!-- Action Buttons -->
                 <div class="action-buttons">
                     <button class="btn btn-edit" onclick="editResults()">
@@ -303,35 +313,53 @@
         </footer>
     </div>
 
-    <!-- Modal para agregar defectos -->
+    <!-- Modal para agregar defectos (MEJORADO CON NUEVO DEFECTO) -->
     <div class="modal" id="add-defect-modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Agregar Defecto</h3>
-                <button class="close-btn" onclick="closeModal()">&times;</button>
+                <h3><i class="fas fa-bug"></i> Agregar Defecto Manual</h3>
+                <button class="close-btn" onclick="closeAddDefectModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Tipo de defecto:</label>
-                    <select id="defect-type">
+                    <label for="defect-type">Tipo de defecto</label>
+                    <select id="defect-type" class="form-control">
                         <option value="">Seleccionar...</option>
-                        <option value="machucón">Machucón</option>
-                        <option value="pudrición húmeda">Pudrición húmeda</option>
-                        <option value="picada de pájaro">Picada de pájaro</option>
-                        <option value="h.c estrella">H.C Estrella</option>
-                        <option value="piel de lagarto">Piel de lagarto</option>
-                        <option value="fruto deshidratado">Fruto deshidratado</option>
-                        <option value="presencia de suzukii">Presencia de Suzukii</option>
+                        <!-- Opciones se rellenan dinámicamente -->
                     </select>
+                    <small class="text-muted new-defect-hint">
+                        <i class="fas fa-lightbulb"></i> Si no encuentras el defecto, elige <strong>"+ Crear nuevo defecto…"</strong>
+                    </small>
                 </div>
-                <div class="form-group">
-                    <label>Cantidad:</label>
-                    <input type="number" id="defect-count" min="1" value="1">
+
+                <!-- Sección para crear nuevo defecto (oculta por defecto) -->
+                <div id="new-defect-section" class="new-defect-section" style="display:none;">
+                    <div class="form-group">
+                        <label for="new-defect-name">
+                            <i class="fas fa-tag"></i> Nombre del nuevo defecto
+                        </label>
+                        <input type="text" id="new-defect-name" class="form-control" placeholder="Ej: Manchas oscuras, Grietas, etc.">
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="persist-new-defect" checked>
+                            <span style="margin-left: 6px;">Guardar este defecto en el perfil actual para futuros análisis</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="defect-count">Cantidad</label>
+                    <input type="number" id="defect-count" class="form-control" min="1" value="1">
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-                <button class="btn btn-primary" onclick="confirmAddDefect()">Agregar</button>
+                <button class="btn btn-secondary" onclick="closeAddDefectModal()">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="btn btn-primary" onclick="confirmAddDefect()">
+                    <i class="fas fa-check"></i> Agregar
+                </button>
             </div>
         </div>
     </div>
@@ -387,6 +415,40 @@
                 </button>
                 <button class="btn btn-primary" onclick="captureFromLiveCamera()">
                     <i class="fas fa-camera"></i> Capturar foto
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Ingreso Manual -->
+    <div class="modal" id="manual-entry-modal" style="display: none;">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3>Ingreso Manual de Defectos</h3>
+                <button class="close-btn" onclick="closeManualEntry()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="manual-entry-info">
+                    <p><i class="fas fa-info-circle"></i> Ingresa manualmente la cantidad de defectos encontrados</p>
+                    <p><strong>Perfil seleccionado:</strong> <span id="manual-profile-name">-</span></p>
+                </div>
+                
+                <div class="defects-manual-list" id="defects-manual-list">
+                    <!-- Los defectos se cargarán dinámicamente según el perfil -->
+                </div>
+                
+                <div class="manual-totals">
+                    <div class="total-defects">
+                        <strong>Total de defectos: <span id="manual-total-defects">0</span></strong>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeManualEntry()">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="btn btn-primary" onclick="submitManualEntry()">
+                    <i class="fas fa-save"></i> Guardar Análisis Manual
                 </button>
             </div>
         </div>

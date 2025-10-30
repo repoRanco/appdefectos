@@ -10,15 +10,56 @@ let currentCameraIndex = 0;
 let currentProfile = 'qc_recepcion'; // Perfil actual seleccionado
 let availableProfiles = {}; // Perfiles disponibles
 
+// Constante para identificar la opción de nuevo defecto
+const NEW_DEFECT_VALUE = '__NEW_DEFECT__';
+
+// ===== Utilidades de Sesión (CAMBIO) =====
+async function syncSessionUser() {
+    try {
+        const r = await fetch('/api/session_check', { credentials: 'include' });
+        if (!r.ok) throw new Error('No auth');
+        const data = await r.json(); // { authenticated, email, role, is_admin, name? }
+        if (data.authenticated) {
+            const uiUser = {
+                email: data.email,
+                name: data.name || data.email,
+                role: data.role,
+                is_admin: data.is_admin,
+                loginTime: new Date().toISOString()
+            };
+            localStorage.setItem('rancoqc_user', JSON.stringify(uiUser));
+            return uiUser;
+        }
+    } catch (e) {
+        console.warn('syncSessionUser falló:', e.message);
+    }
+    return null;
+}
+
+function getCurrentUser() {
+    const userData = localStorage.getItem('rancoqc_user');
+    return userData ? JSON.parse(userData) : null;
+}
+
+function getSafeUserName() {
+    const u = currentUser || getCurrentUser();
+    if (u?.name && u.name.trim()) return u.name.trim();
+    if (u?.email && u.email.trim()) return u.email.trim();
+    return null;
+}
+
 // Inicializar la aplicación
 document.addEventListener('DOMContentLoaded', function() {
     initializeAnalysis();
 });
 
 // Inicializar análisis
-function initializeAnalysis() {
-    // Verificar autenticación
+async function initializeAnalysis() {
+    // Verificar autenticación (prioriza sesión del servidor) (CAMBIO)
     currentUser = getCurrentUser();
+    if (!currentUser) {
+        currentUser = await syncSessionUser();
+    }
     if (!currentUser) {
         window.location.href = 'login.html';
         return;
@@ -53,6 +94,7 @@ function initializeAnalysis() {
     // Configurar validación de formulario
     setupFormValidation();
 }
+
 // Configurar selector de perfil basado en el análisis seleccionado
 function setupProfileSelector() {
     const profileSelect = document.getElementById('profile-select');
@@ -77,7 +119,7 @@ function setupProfileSelector() {
 function setupUserInterface() {
     const userNameElement = document.getElementById('user-name');
     if (userNameElement && currentUser) {
-        userNameElement.textContent = currentUser.name;
+        userNameElement.textContent = currentUser.name || currentUser.email || 'Usuario';
     }
 }
 
@@ -146,7 +188,7 @@ function setupEventListeners() {
     if (captureArea) {
         captureArea.addEventListener('click', function() {
             if (!selectedImage) {
-                fileInput.click();
+                fileInput?.click();
             }
         });
     }
@@ -365,6 +407,14 @@ async function analyzeImage() {
         showNotification('Por favor selecciona un perfil de análisis', 'error');
         return;
     }
+
+    // Verificar usuario seguro (CAMBIO)
+    const userName = getSafeUserName();
+    if (!userName) {
+        showNotification('Sesión inválida. Inicia sesión nuevamente.', 'error');
+        window.location.href = 'login.html';
+        return;
+    }
     
     // Mostrar loading
     showLoading();
@@ -388,7 +438,7 @@ async function analyzeImage() {
             analysis_type: analysisType,
             module: currentModule,
             profile: currentProfile,
-            user: currentUser.name,
+            user: userName, // CAMBIO
             timestamp: new Date().toISOString()
         };
         
@@ -403,10 +453,11 @@ async function analyzeImage() {
         // Actualizar estado de loading
         updateLoadingStatus('Enviando imagen al servidor...');
         
-        // Llamar al backend
+        // Llamar al backend (CAMBIO: credentials)
         const response = await fetch('/analyze_cherries', {
             method: 'POST',
-            body: formData
+            body: formData,
+            credentials: 'include'
         });
         
         if (!response.ok) {
@@ -451,6 +502,13 @@ async function captureFromLocalCamera() {
             return;
         }
 
+        const userName = getSafeUserName(); // CAMBIO
+        if (!userName) {
+            showNotification('Sesión inválida. Inicia sesión nuevamente.', 'error');
+            window.location.href = 'login.html';
+            return;
+        }
+
         const cameraType = document.getElementById('camera-type').value || 'usb';
         const cameraIndex = parseInt(document.getElementById('camera-index').value) || 0;
 
@@ -459,15 +517,17 @@ async function captureFromLocalCamera() {
         hideSection('results-section');
         updateLoadingStatus(`Accediendo a cámara ${cameraType.toUpperCase()}...`);
 
-        // Llamar endpoint backend
+        // Llamar endpoint backend (CAMBIO: credentials)
         const response = await fetch('/capture_local_camera', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
                 profile: currentProfile,
                 distribucion: distribucion,
                 camera_type: cameraType,
-                camera_index: cameraIndex
+                camera_index: cameraIndex,
+                user: userName // CAMBIO
             })
         });
 
@@ -541,23 +601,32 @@ async function analyzeFromRTSP() {
             return;
         }
 
+        const userName = getSafeUserName(); // CAMBIO
+        if (!userName) {
+            showNotification('Sesión inválida. Inicia sesión nuevamente.', 'error');
+            window.location.href = 'login.html';
+            return;
+        }
+
         // Mostrar loading
         showLoading();
         hideSection('results-section');
         updateLoadingStatus('Conectando a la cámara RTSP...');
 
-        // Llamar endpoint backend
+        // Llamar endpoint backend (CAMBIO: credentials)
         const response = await fetch('/analyze_rtsp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
                 rtsp_url: rtspUrl,
                 timeout_sec: 8,
                 warmup_frames: 5,
-                profile: currentProfile, // Agregar perfil seleccionado
-                distribucion: document.getElementById('distribucion').value, // Agregar distribución
-                max_resolution: '1920x1080', // Resolución máxima para cámaras de alta resolución
-                auto_resize: true // Auto-redimensionar cámaras de alta resolución
+                profile: currentProfile,
+                distribucion: document.getElementById('distribucion').value,
+                max_resolution: '1920x1080',
+                auto_resize: true,
+                user: userName // CAMBIO
             })
         });
 
@@ -670,9 +739,7 @@ function displayDefectsList(defects) {
     }
     
     // Usar los nombres exactos de las zonas como aparecen en los resultados
-    // Los nombres ya vienen del backend con los nombres correctos de las zonas
     const defectsHTML = Object.entries(defects).map(([zoneName, count]) => {
-        // Usar el nombre de la zona tal como viene del backend
         const defectName = zoneName;
         
         // Generar descripción basada en el perfil actual
@@ -797,7 +864,7 @@ function newAnalysis() {
         analysisResults = null;
         
         // Resetear formulario
-        document.querySelector('.form-section').reset();
+        document.querySelector('.form-section')?.reset();
         
         // Resetear vista previa
         const captureArea = document.getElementById('capture-area');
@@ -830,6 +897,13 @@ async function uploadData() {
         showNotification('No hay datos para subir', 'error');
         return;
     }
+
+    const userName = getSafeUserName(); // CAMBIO
+    if (!userName) {
+        showNotification('Sesión inválida. Inicia sesión nuevamente.', 'error');
+        window.location.href = 'login.html';
+        return;
+    }
     
     try {
         showNotification('Subiendo datos a PostgreSQL...', 'info');
@@ -841,7 +915,7 @@ async function uploadData() {
                 confidence_used: analysisResults.confidence_used || 0.8
             },
             form_data: {
-                user: currentUser.name,
+                user: userName, // CAMBIO
                 profile: currentProfile,
                 distribucion: document.getElementById('distribucion').value,
                 analysis_type: analysisType,
@@ -863,12 +937,13 @@ async function uploadData() {
             }
         };
         
-        // Enviar al endpoint de forzar subida
+        // Enviar al endpoint de forzar subida (CAMBIO: credentials)
         const response = await fetch('/force_upload_analysis', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify(uploadPayload)
         });
         
@@ -900,6 +975,7 @@ async function uploadData() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'include', // CAMBIO
                 body: JSON.stringify(uploadPayload)
             });
             
@@ -920,6 +996,13 @@ function saveData() {
         showNotification('No hay datos para guardar', 'error');
         return;
     }
+
+    const userName = getSafeUserName(); // CAMBIO
+    if (!userName) {
+        showNotification('Sesión inválida. Inicia sesión nuevamente.', 'error');
+        window.location.href = 'login.html';
+        return;
+    }
     
     try {
         // Exportar a Excel
@@ -937,7 +1020,7 @@ function saveData() {
                 module: currentModule
             },
             saved_at: new Date().toISOString(),
-            user: currentUser.name
+            user: userName // CAMBIO
         };
         
         const saveKey = `analysis_${Date.now()}`;
@@ -982,7 +1065,7 @@ function exportToExcel() {
         worksheetData.push(['REPORTE DE ANÁLISIS RANCOQC']);
         worksheetData.push(['']);
         worksheetData.push(['INFORMACIÓN GENERAL']);
-        worksheetData.push(['Usuario:', currentUser.name]);
+        worksheetData.push(['Usuario:', getSafeUserName() || '']); // CAMBIO
         worksheetData.push(['Fecha y Hora:', new Date().toLocaleString('es-CL')]);
         worksheetData.push(['Módulo:', formData.module.toUpperCase()]);
         worksheetData.push(['Tipo de Análisis:', formData.analysis_type.replace('-', ' ').toUpperCase()]);
@@ -1014,7 +1097,6 @@ function exportToExcel() {
         
         const totalDefects = analysisResults.total_cherries || 1; // Evitar división por cero
         
-        // Usar los nombres exactos de las zonas como aparecen en los resultados
         Object.entries(analysisResults.results || {}).forEach(([zoneName, count]) => {
             const percentage = ((count / totalDefects) * 100).toFixed(2);
             worksheetData.push([zoneName, count, `${percentage}%`]);
@@ -1085,28 +1167,202 @@ function editDefect(defectType, currentCount) {
     }
 }
 
-function confirmAddDefect() {
-    const defectType = document.getElementById('defect-type').value;
-    const defectCount = parseInt(document.getElementById('defect-count').value);
-    
-    if (!defectType || !defectCount || defectCount < 1) {
-        showNotification('Por favor completa todos los campos correctamente', 'error');
-        return;
-    }
-    
-    // Actualizar resultados
-    if (analysisResults && analysisResults.results) {
-        analysisResults.results[defectType] = defectCount;
-        analysisResults.total_cherries = Object.values(analysisResults.results).reduce((a, b) => a + b, 0);
+// ===== FUNCIONES PARA AGREGAR NUEVO DEFECTO =====
+
+// Función para abrir el modal de agregar defecto manual (MEJORADA CON NUEVO DEFECTO)
+async function addManualDefect() {
+    try {
+        if (!analysisResults) {
+            showNotification('No hay resultados de análisis para modificar', 'error');
+            return;
+        }
         
-        // Actualizar interfaz
-        displayDefectsList(analysisResults.results);
-        document.getElementById('total-cherries').textContent = analysisResults.total_cherries;
+        // Cargar defectos disponibles para el perfil actual
+        await loadDefectsForProfile(currentProfile);
         
-        showNotification('Defecto actualizado correctamente', 'success');
+        const modal = document.getElementById('add-defect-modal');
+        const defectTypeSelect = document.getElementById('defect-type');
+        const defectCountInput = document.getElementById('defect-count');
+        const newDefectSection = document.getElementById('new-defect-section');
+        const newDefectNameInput = document.getElementById('new-defect-name');
+        const persistNewDefectCheckbox = document.getElementById('persist-new-defect');
+        
+        if (!modal || !defectTypeSelect || !defectCountInput) {
+            console.error('Elementos del modal no encontrados');
+            return;
+        }
+        
+        // Limpiar y poblar el selector con defectos del perfil
+        defectTypeSelect.innerHTML = '<option value="">Seleccionar...</option>';
+        
+        availableDefects.forEach(defect => {
+            const option = document.createElement('option');
+            option.value = defect;
+            option.textContent = defect;
+            defectTypeSelect.appendChild(option);
+        });
+        
+        // Agregar opción para crear nuevo defecto
+        const createNewOption = document.createElement('option');
+        createNewOption.value = NEW_DEFECT_VALUE;
+        createNewOption.textContent = '+ Crear nuevo defecto…';
+        createNewOption.style.fontWeight = 'bold';
+        createNewOption.style.color = '#0066cc';
+        defectTypeSelect.appendChild(createNewOption);
+        
+        // Resetear valores
+        defectCountInput.value = 1;
+        if (newDefectSection) newDefectSection.style.display = 'none';
+        if (newDefectNameInput) newDefectNameInput.value = '';
+        if (persistNewDefectCheckbox) persistNewDefectCheckbox.checked = true;
+        
+        // Listener para mostrar/ocultar sección de nuevo defecto
+        defectTypeSelect.onchange = function() {
+            if (this.value === NEW_DEFECT_VALUE) {
+                if (newDefectSection) {
+                    newDefectSection.style.display = 'block';
+                    if (newDefectNameInput) newDefectNameInput.focus();
+                }
+            } else {
+                if (newDefectSection) {
+                    newDefectSection.style.display = 'none';
+                    if (newDefectNameInput) newDefectNameInput.value = '';
+                }
+            }
+        };
+        
+        // Mostrar modal
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        
+    } catch (error) {
+        console.error('Error abriendo agregar defecto:', error);
+        showNotification('Error al abrir agregar defecto: ' + error.message, 'error');
     }
-    
-    closeModal();
+}
+
+// Función para cerrar el modal de agregar defecto
+function closeAddDefectModal() {
+    const modal = document.getElementById('add-defect-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+// Función para confirmar y agregar el defecto (MEJORADA CON NUEVO DEFECTO)
+async function confirmAddDefect() {
+    try {
+        const defectTypeSelect = document.getElementById('defect-type');
+        const defectCountInput = document.getElementById('defect-count');
+        const newDefectNameInput = document.getElementById('new-defect-name');
+        const persistNewDefectCheckbox = document.getElementById('persist-new-defect');
+        
+        if (!defectTypeSelect || !defectCountInput) {
+            showNotification('Error: elementos del formulario no encontrados', 'error');
+            return;
+        }
+        
+        let defectName = defectTypeSelect.value;
+        const count = parseInt(defectCountInput.value || '1', 10);
+        
+        // Validar que se haya seleccionado un defecto
+        if (!defectName) {
+            showNotification('Debes seleccionar un tipo de defecto', 'warning');
+            defectTypeSelect.focus();
+            return;
+        }
+        
+        // Validar cantidad
+        if (!Number.isFinite(count) || count < 1) {
+            showNotification('La cantidad debe ser un número mayor o igual a 1', 'warning');
+            defectCountInput.focus();
+            return;
+        }
+        
+        // Si eligió crear nuevo defecto
+        if (defectName === NEW_DEFECT_VALUE) {
+            const newName = (newDefectNameInput?.value || '').trim();
+            
+            if (!newName) {
+                showNotification('Debes ingresar el nombre del nuevo defecto', 'warning');
+                if (newDefectNameInput) newDefectNameInput.focus();
+                return;
+            }
+            
+            // Validar que no exista ya
+            if (availableDefects.includes(newName)) {
+                showNotification('Este defecto ya existe en el perfil', 'warning');
+                return;
+            }
+            
+            defectName = newName;
+            
+            // Persistir en el perfil si está marcado
+            if (persistNewDefectCheckbox?.checked) {
+                try {
+                    await persistDefectInProfile(defectName, currentProfile);
+                    // Agregar a la lista local
+                    availableDefects.push(defectName);
+                    showNotification(`Nuevo defecto "${defectName}" guardado en el perfil`, 'success');
+                } catch (error) {
+                    console.warn('No se pudo persistir el defecto:', error);
+                    showNotification('El defecto se usará pero no se guardó en el perfil', 'warning');
+                }
+            }
+        }
+        
+        // Actualizar resultados
+        if (analysisResults && analysisResults.results) {
+            // Si ya existe el defecto, sumar; si no, crearlo
+            if (analysisResults.results[defectName]) {
+                analysisResults.results[defectName] += count;
+            } else {
+                analysisResults.results[defectName] = count;
+            }
+            
+            // Recalcular total
+            analysisResults.total_cherries = Object.values(analysisResults.results).reduce((a, b) => a + b, 0);
+            
+            // Actualizar interfaz
+            displayDefectsList(analysisResults.results);
+            document.getElementById('total-cherries').textContent = analysisResults.total_cherries;
+            
+            showNotification(`${defectName} agregado: +${count} (Total: ${analysisResults.results[defectName]})`, 'success');
+            
+            // Marcar como modificado
+            analysisResults.manual_modifications = true;
+        }
+        
+        closeAddDefectModal();
+        
+    } catch (error) {
+        console.error('Error agregando defecto manual:', error);
+        showNotification('Error al agregar defecto: ' + (error.message || 'Desconocido'), 'error');
+    }
+}
+
+// Persistir el nuevo defecto en el perfil (ajusta a tu API real)
+async function persistDefectInProfile(defectName, profileName) {
+    try {
+        // Ejemplo de endpoint: POST /api/profiles/{profile}/defects
+        const res = await fetch(`/api/profiles/${encodeURIComponent(profileName)}/defects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ defect: defectName })
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`No se pudo guardar el defecto en el perfil (${res.status}): ${text}`);
+        }
+        const result = await res.json();
+        console.log('Defecto persistido:', result);
+    } catch (e) {
+        // No bloquear la acción principal si falló persistir; solo avisar
+        console.warn('No se pudo persistir el nuevo defecto:', e);
+        throw e;
+    }
 }
 
 // Funciones de utilidad
@@ -1182,13 +1438,10 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function getCurrentUser() {
-    const userData = localStorage.getItem('rancoqc_user');
-    return userData ? JSON.parse(userData) : null;
-}
-
 function logout() {
     if (confirm('¿Estás seguro de que deseas cerrar sesión?')) {
+        // Cerrar sesión en backend opcionalmente
+        fetch('/api/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
         localStorage.removeItem('rancoqc_user');
         localStorage.removeItem('rancoqc_analysis_type');
         localStorage.removeItem('rancoqc_current_module');
@@ -1228,6 +1481,7 @@ function showNotification(message, type = 'info') {
             .notification.success { background: #d1fae5; border-left: 4px solid #10b981; }
             .notification.error { background: #fef2f2; border-left: 4px solid #ef4444; }
             .notification.info { background: #dbeafe; border-left: 4px solid #3b82f6; }
+            .notification.warning { background: #fef3c7; border-left: 4px solid #f59e0b; }
             .notification-content {
                 display: flex;
                 align-items: center;
@@ -1328,6 +1582,7 @@ window.confirmAddDefect = confirmAddDefect;
 window.adjustDefectCount = adjustDefectCount;
 window.exportToExcel = exportToExcel;
 window.closeModal = closeModal;
+window.closeAddDefectModal = closeAddDefectModal;
 window.closeConfirmModal = closeConfirmModal;
 window.confirmAction = confirmAction;
 window.logout = logout;
@@ -1661,3 +1916,372 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('Funcionalidad de cámara deshabilitada: no soportada por el navegador');
     }
 });
+
+// ===== MANUAL ENTRY FUNCTIONS =====
+
+// Variables para ingreso manual
+let manualDefects = {};
+let availableDefects = [];
+
+// Abrir modal de ingreso manual
+async function openManualEntry() {
+    try {
+        // Validar que se haya seleccionado un perfil
+        if (!currentProfile) {
+            showNotification('Por favor selecciona un perfil de análisis primero', 'error');
+            return;
+        }
+        
+        // Validar formulario básico
+        const distribucion = document.getElementById('distribucion').value;
+        if (!distribucion) {
+            showNotification('Por favor selecciona una distribución (Roja/Bicolor)', 'error');
+            return;
+        }
+        
+        // Cargar defectos disponibles para el perfil actual
+        await loadDefectsForProfile(currentProfile);
+        
+        // Configurar modal
+        const modal = document.getElementById('manual-entry-modal');
+        const profileName = document.getElementById('manual-profile-name');
+        
+        if (modal && profileName) {
+            const profileDisplayNames = {
+                'qc_recepcion': 'QC Recepción',
+                'packing_qc': 'Packing QC',
+                'contramuestra': 'Contramuestra'
+            };
+            
+            profileName.textContent = profileDisplayNames[currentProfile] || currentProfile;
+            
+            // Resetear defectos manuales
+            manualDefects = {};
+            availableDefects.forEach(defect => {
+                manualDefects[defect] = 0;
+            });
+            
+            // Mostrar lista de defectos
+            displayManualDefectsList();
+            updateManualTotal();
+            
+            // Mostrar modal
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+        
+    } catch (error) {
+        console.error('Error abriendo ingreso manual:', error);
+        showNotification('Error al abrir ingreso manual: ' + error.message, 'error');
+    }
+}
+
+// Cargar defectos para el perfil actual
+async function loadDefectsForProfile(profile) {
+    try {
+        const response = await fetch(`/api/defects/${profile}`, { credentials: 'include' }); // CAMBIO
+        const result = await response.json();
+        
+        if (result.success) {
+            availableDefects = result.defects;
+            console.log(`Defectos cargados para ${profile}:`, availableDefects);
+        } else {
+            throw new Error(result.error || 'Error cargando defectos');
+        }
+        
+    } catch (error) {
+        console.error('Error cargando defectos:', error);
+        showNotification('Error cargando defectos: ' + error.message, 'error');
+        
+        // Fallback a defectos por defecto
+        availableDefects = [
+            'FRUTO DOBLE', 'HIJUELO', 'DAÑO TRIPS', 'DAÑO PLAGA', 'VIROSIS',
+            'FRUTO DEFORME', 'HC ESTRELLA', 'RUSSET', 'HC MEDIALUNA', 'HC SATURA',
+            'PICADA DE PAJARO', 'HERIDA ABIERTA', 'PUDRICION HUMEDA', 'PUDRICION SECA',
+            'FRUTO DESHIDRATADO', 'CRACKING CICATRIZADO', 'SUTURA DE FORMA',
+            'FRUTO SIN PEDICELO', 'MACHUCON'
+        ];
+    }
+}
+
+// Mostrar lista de defectos para ingreso manual
+function displayManualDefectsList() {
+    const container = document.getElementById('defects-manual-list');
+    if (!container) return;
+    
+    const defectsHTML = availableDefects.map(defect => {
+        const count = manualDefects[defect] || 0;
+        const countClass = count === 0 ? 'zero' : count <= 3 ? 'medium' : 'high';
+        
+        return `
+            <div class="manual-defect-item">
+                <div class="defect-info">
+                    <div class="defect-name">${defect}</div>
+                    <div class="defect-description">Ingreso manual</div>
+                </div>
+                <div class="defect-count-container">
+                    <button class="defect-count-btn decrease" onclick="adjustManualDefectCount('${defect}', -1)" title="Disminuir">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    <div class="defect-count ${countClass}" id="manual-count-${defect.replace(/\s+/g, '-')}">${count}</div>
+                    <button class="defect-count-btn increase" onclick="adjustManualDefectCount('${defect}', 1)" title="Aumentar">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="defect-actions">
+                    <input type="number" class="manual-input" min="0" value="${count}" 
+                           onchange="setManualDefectCount('${defect}', this.value)"
+                           placeholder="0">
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = defectsHTML;
+    
+    // Agregar estilos si no existen
+    if (!document.querySelector('#manual-entry-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'manual-entry-styles';
+        styles.textContent = `
+            .manual-defect-item {
+                display: flex;
+                align-items: center;
+                padding: 12px;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                margin-bottom: 8px;
+                background: white;
+            }
+            
+            .manual-defect-item .defect-info {
+                flex: 1;
+                padding-right: 12px;
+            }
+            
+            .manual-defect-item .defect-name {
+                font-weight: 600;
+                color: #374151;
+                font-size: 0.9rem;
+            }
+            
+            .manual-defect-item .defect-description {
+                font-size: 0.8rem;
+                color: #6b7280;
+            }
+            
+            .manual-defect-item .defect-count-container {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-right: 12px;
+            }
+            
+            .manual-defect-item .defect-actions {
+                min-width: 80px;
+            }
+            
+            .manual-input {
+                width: 70px;
+                padding: 4px 8px;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                text-align: center;
+                font-size: 0.9rem;
+            }
+            
+            .manual-totals {
+                background: #f9fafb;
+                padding: 16px;
+                border-radius: 8px;
+                margin-top: 16px;
+                text-align: center;
+            }
+            
+            .manual-entry-info {
+                background: #dbeafe;
+                padding: 12px;
+                border-radius: 8px;
+                margin-bottom: 16px;
+            }
+            
+            .manual-entry-info p {
+                margin: 4px 0;
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+}
+
+// Ajustar contador manual de defectos
+function adjustManualDefectCount(defectType, change) {
+    const currentCount = manualDefects[defectType] || 0;
+    const newCount = Math.max(0, currentCount + change);
+    
+    manualDefects[defectType] = newCount;
+    
+    // Actualizar interfaz
+    const countElement = document.getElementById(`manual-count-${defectType.replace(/\s+/g, '-')}`);
+    const inputElement = document.querySelector(`input[onchange*="${defectType}"]`);
+    
+    if (countElement) {
+        countElement.textContent = newCount;
+        countElement.className = `defect-count ${newCount === 0 ? 'zero' : newCount <= 3 ? 'medium' : 'high'}`;
+    }
+    
+    if (inputElement) {
+        inputElement.value = newCount;
+    }
+    
+    updateManualTotal();
+}
+
+// Establecer contador manual de defectos
+function setManualDefectCount(defectType, value) {
+    const count = Math.max(0, parseInt(value) || 0);
+    manualDefects[defectType] = count;
+    
+    // Actualizar interfaz
+    const countElement = document.getElementById(`manual-count-${defectType.replace(/\s+/g, '-')}`);
+    
+    if (countElement) {
+        countElement.textContent = count;
+        countElement.className = `defect-count ${count === 0 ? 'zero' : count <= 3 ? 'medium' : 'high'}`;
+    }
+    
+    updateManualTotal();
+}
+
+// Actualizar total manual
+function updateManualTotal() {
+    const total = Object.values(manualDefects).reduce((sum, count) => sum + count, 0);
+    const totalElement = document.getElementById('manual-total-defects');
+    
+    if (totalElement) {
+        totalElement.textContent = total;
+    }
+}
+
+// Cerrar modal de ingreso manual
+function closeManualEntry() {
+    const modal = document.getElementById('manual-entry-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+    
+    // Resetear datos
+    manualDefects = {};
+    availableDefects = [];
+}
+
+// Enviar análisis manual
+async function submitManualEntry() {
+    try {
+        // Validar que hay datos
+        const total = Object.values(manualDefects).reduce((sum, count) => sum + count, 0);
+        if (total === 0) {
+            showNotification('Debe ingresar al menos un defecto', 'error');
+            return;
+        }
+        
+        // Validar formulario
+        const distribucion = document.getElementById('distribucion').value;
+        const guiaSii = document.getElementById('guia-sii').value.trim();
+        const lote = document.getElementById('lote').value.trim();
+        const numFrutos = document.getElementById('num-frutos').value.trim();
+        
+        if (!distribucion || !guiaSii || !lote || !numFrutos) {
+            showNotification('Por favor completa todos los campos del formulario', 'error');
+            return;
+        }
+
+        const userName = getSafeUserName(); // CAMBIO
+        if (!userName) {
+            showNotification('Sesión inválida. Inicia sesión nuevamente.', 'error');
+            window.location.href = 'login.html';
+            return;
+        }
+        
+        // Filtrar solo defectos con cantidad > 0
+        const filteredDefects = {};
+        Object.entries(manualDefects).forEach(([defect, count]) => {
+            if (count > 0) {
+                filteredDefects[defect] = count;
+            }
+        });
+        
+        // Preparar datos para enviar
+        const manualData = {
+            user: userName, // CAMBIO
+            profile: currentProfile,
+            distribucion: distribucion,
+            guia_sii: guiaSii,
+            lote: lote,
+            num_frutos: parseInt(numFrutos),
+            defects: filteredDefects
+        };
+        
+        // Agregar campos específicos de Packing QC
+        if (currentProfile === 'packing_qc') {
+            manualData.num_proceso = document.getElementById('num-proceso')?.value || '';
+            manualData.id_caja = document.getElementById('id-caja')?.value || '';
+        }
+        
+        showNotification('Guardando análisis manual...', 'info');
+        
+        // Enviar al backend (CAMBIO: credentials)
+        const response = await fetch('/manual_analysis', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(manualData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Simular resultados de análisis
+            analysisResults = {
+                results: result.results,
+                total_cherries: result.total_cherries,
+                confidence_used: 1.0,
+                zones_loaded: Object.keys(result.results).length,
+                processed_image: null,
+                detections_by_zone: {},
+                image_size: null,
+                zones_available: Object.keys(result.results),
+                timestamp: result.timestamp,
+                analysis_type: 'manual',
+                database_status: result.database_status,
+                analysis_id: result.analysis_id
+            };
+            
+            // Cerrar modal
+            closeManualEntry();
+            
+            // Ocultar formulario y mostrar resultados
+            hideSection('form-section');
+            displayResults(analysisResults);
+            
+            showNotification(`Análisis manual guardado con ${total} defectos`, 'success');
+            
+        } else {
+            throw new Error(result.error || 'Error desconocido');
+        }
+        
+    } catch (error) {
+        console.error('Error enviando análisis manual:', error);
+        showNotification('Error guardando análisis manual: ' + error.message, 'error');
+    }
+}
+
+// Agregar funciones al objeto global
+window.openManualEntry = openManualEntry;
+window.closeManualEntry = closeManualEntry;
+window.submitManualEntry = submitManualEntry;
+window.adjustManualDefectCount = adjustManualDefectCount;
+window.setManualDefectCount = setManualDefectCount;
+window.addManualDefect = addManualDefect;2

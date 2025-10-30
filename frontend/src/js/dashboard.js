@@ -242,7 +242,7 @@ function createUser() {
         return;
     }
     
-    window.location.href = 'create-user.html';
+    window.location.href = 'crear_usuario.html';
 }
 
 // Mostrar configuración

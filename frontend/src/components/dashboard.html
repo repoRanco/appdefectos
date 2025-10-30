@@ -246,6 +246,21 @@
         </div>
     </div>
 
+    <script>
+// Si el usuario es admin, mostrar el botón de crear usuario
+window.onload = function() {
+    // Simulación: usa tu sistema real (ej. sessionStorage, fetch, etc.)
+    // Aquí asume que is_admin se guarda en sessionStorage después del login
+    const isAdmin = sessionStorage.getItem('is_admin') === 'true';
+    if(isAdmin) {
+        document.getElementById('create-user-btn').style.display = 'block';
+    }
+};
+
+function createUser() {
+  window.location.href = '/crear_usuario';
+}
+</script>
     <script src="../js/dashboard.js"></script>
 </body>
 </html>
