@@ -122,6 +122,17 @@ class SyncHistory(Base):
     error_message = Column(Text, nullable=True)
     user_name = Column(String(100), nullable=True)
 
+class User(Base):
+    """Modelo de usuario"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), unique=True, nullable=False)
+    password_hash = Column(String(256), nullable=False)
+    role = Column(String(20), nullable=False, default='operador')  # 'admin' o 'operador'
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 # Funciones de utilidad para base de datos
 def get_db_session():
     """Obtener sesión de base de datos principal"""
@@ -430,6 +441,178 @@ def sync_pending_data():
     except Exception as e:
         print(f"❌ Error en sincronización: {e}")
         return {"synced": 0, "errors": 1, "message": str(e)}
+
+# Funciones de usuario
+import hashlib
+from sqlalchemy.exc import IntegrityError
+
+def hash_password(password):
+    """Devuelve hash SHA256 de la contraseña"""
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+def create_user(username, password, role='operador'):
+    """Crear un nuevo usuario"""
+    db = get_db_session()
+    try:
+        user = User(
+            username=username, 
+            password_hash=hash_password(password), 
+            role=role
+        )
+        db.add(user)
+        db.commit()
+        user_id = user.id
+        db.close()
+        return {"success": True, "user": username, "role": role, "user_id": user_id}
+    except IntegrityError:
+        db.rollback()
+        db.close()
+        return {"success": False, "error": "Usuario ya existe"}
+    except Exception as e:
+        db.rollback()
+        db.close()
+        return {"success": False, "error": str(e)}
+
+def authenticate_user(username, password):
+    """Autenticar usuario"""
+    db = get_db_session()
+    try:
+        user = db.query(User).filter_by(username=username).first()
+        if user and user.password_hash == hash_password(password):
+            result = {
+                "success": True, 
+                "role": user.role, 
+                "user_id": user.id,
+                "username": user.username
+            }
+            db.close()
+            return result
+        db.close()
+        return {"success": False, "error": "Credenciales incorrectas"}
+    except Exception as e:
+        db.close()
+        return {"success": False, "error": str(e)}
+
+def get_all_users():
+    """Obtener todos los usuarios (solo para admins)"""
+    db = get_db_session()
+    try:
+        users = db.query(User).order_by(User.created_at.desc()).all()
+        result = []
+        for user in users:
+            result.append({
+                'id': user.id,
+                'username': user.username,
+                'role': user.role,
+                'created_at': user.created_at.isoformat()
+            })
+        db.close()
+        return result
+    except Exception as e:
+        db.close()
+        print(f"Error obteniendo usuarios: {e}")
+        return []
+
+def delete_user(user_id):
+    """Eliminar usuario (solo para admins)"""
+    db = get_db_session()
+    try:
+        user = db.query(User).filter_by(id=user_id).first()
+        if user:
+            if user.role == 'admin':
+                # Verificar que no sea el único admin
+                admin_count = db.query(User).filter_by(role='admin').count()
+                if admin_count <= 1:
+                    db.close()
+                    return {"success": False, "error": "No se puede eliminar el único administrador"}
+            
+            db.delete(user)
+            db.commit()
+            db.close()
+            return {"success": True, "message": "Usuario eliminado correctamente"}
+        else:
+            db.close()
+            return {"success": False, "error": "Usuario no encontrado"}
+    except Exception as e:
+        db.rollback()
+        db.close()
+        return {"success": False, "error": str(e)}
+
+def update_user_role(user_id, new_role):
+    """Actualizar rol del usuario"""
+    if new_role not in ['admin', 'operador']:
+        return {"success": False, "error": "Rol inválido"}
+        
+    db = get_db_session()
+    try:
+        user = db.query(User).filter_by(id=user_id).first()
+        if user:
+            if user.role == 'admin' and new_role == 'operador':
+                # Verificar que no sea el único admin
+                admin_count = db.query(User).filter_by(role='admin').count()
+                if admin_count <= 1:
+                    db.close()
+                    return {"success": False, "error": "No se puede cambiar el rol del único administrador"}
+            
+            user.role = new_role
+            user.updated_at = datetime.utcnow()
+            db.commit()
+            db.close()
+            return {"success": True, "message": "Rol actualizado correctamente"}
+        else:
+            db.close()
+            return {"success": False, "error": "Usuario no encontrado"}
+    except Exception as e:
+        db.rollback()
+        db.close()
+        return {"success": False, "error": str(e)}
+
+def create_admin_user():
+    """Crear usuario administrador inicial"""
+    admin_exists = False
+    try:
+        db = get_db_session()
+        admin_count = db.query(User).filter_by(role='admin').count()
+        admin_exists = admin_count > 0
+        db.close()
+    except:
+        pass
+    
+    if not admin_exists:
+        result = create_user('admin', 'admin123', 'admin')
+        if result['success']:
+            print("✅ Usuario administrador creado: admin / admin123")
+        else:
+            print(f"⚠️ Error creando admin: {result['error']}")
+        return result
+    else:
+        print("✅ Usuario administrador ya existe")
+        return {"success": True, "message": "Admin ya existe"}
+
+def get_defects_for_profile(profile):
+    """Obtener lista de defectos disponibles según el perfil"""
+    defects_by_profile = {
+        'qc_recepcion': [
+            'FRUTO DOBLE', 'HIJUELO', 'DAÑO TRIPS', 'DAÑO PLAGA', 'VIROSIS',
+            'FRUTO DEFORME', 'HC ESTRELLA', 'RUSSET', 'HC MEDIALUNA', 'HC SATURA',
+            'PICADA DE PAJARO', 'HERIDA ABIERTA', 'PUDRICION HUMEDA', 'PUDRICION SECA',
+            'FRUTO DESHIDRATADO', 'CRACKING CICATRIZADO', 'SUTURA DE FORMA',
+            'FRUTO SIN PEDICELO', 'MACHUCON'
+        ],
+        'packing_qc': [
+            'BANDEJA_1', 'BANDEJA_2', 'BANDEJA_3', 'BANDEJA_4',
+            'CONTROL_CALIDAD', 'DESCARTE', 'EMPAQUE_FINAL', 'ETIQUETADO'
+        ],
+        'contramuestra': [
+            'FRUTO DOBLE', 'HIJUELO', 'DAÑO TRIPS', 'DAÑO PLAGA', 'VIROSIS',
+            'FRUTO DEFORME', 'HC ESTRELLA', 'RUSSET', 'HC MEDIALUNA', 'HC SATURA',
+            'PICADA DE PAJARO', 'HERIDA ABIERTA', 'PUDRICION HUMEDA', 'PUDRICION SECA',
+            'FRUTO DESHIDRATADO', 'CRACKING CICATRIZADO', 'SUTURA DE FORMA',
+            'FRUTO SIN PEDICELO', 'MACHUCON'
+        ]
+    }
+    
+    return defects_by_profile.get(profile, defects_by_profile['qc_recepcion'])
 
 # Inicializar base de datos al importar
 if __name__ == "__main__":

@@ -16,14 +16,17 @@ import tempfile
 from database import (
     create_tables, test_db_connection, save_analysis_result, 
     get_analysis_history, sync_pending_data, save_to_local_cache,
-    get_local_history, DB_AVAILABLE
+    get_local_history, DB_AVAILABLE, create_admin_user, authenticate_user,
+    create_user, get_all_users, delete_user, update_user_role, get_defects_for_profile
 )
+from flask import session
 
 # Cargar variables de entorno
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Permitir requests desde frontend
+# Configurar CORS con soporte para credenciales
+CORS(app, supports_credentials=True, origins=["http://localhost:5001", "http://127.0.0.1:5001"])
 
 # Cargar modelo entrenado
 MODEL_PATH = "best.pt"  # Cambia por tu ruta
@@ -569,6 +572,10 @@ def history():
     """Página de historial"""
     return send_from_directory('../frontend/src/components', 'history.html')
 
+@app.route('/crear_usuario')
+def crear_usuario_pantalla():
+    return send_from_directory('../frontend/src/components', 'crear_usuario.html')
+
 @app.route('/<page>.html')
 def redirect_html(page):
     """Redirige rutas con .html a su equivalente sin extensión"""
@@ -752,6 +759,70 @@ def analyze_cherries():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.json
+    user = authenticate_user(data['username'], data['password'])
+    if user['success']:
+        session['username'] = data['username']
+        session['user_id'] = user.get('user_id')
+        session['role'] = user['role']
+        session['is_admin'] = (user['role'] == 'admin')
+        session.permanent = True
+        print(f"✅ Usuario logueado: {data['username']}, Rol: {user['role']}, Admin: {user['role'] == 'admin'}")
+        return jsonify({"success": True, "role": user['role'], "is_admin": (user['role'] == 'admin')})
+    else:
+        print(f"❌ Login fallido para: {data['username']}")
+        return jsonify(user), 401
+
+@app.route('/api/session_check', methods=['GET'])
+def api_session_check():
+    """Verificar estado de sesión"""
+    session_data = {
+        "logged_in": 'username' in session,
+        "username": session.get('username'),
+        "role": session.get('role'),
+        "is_admin": session.get('is_admin', False),
+        "session_keys": list(session.keys())
+    }
+    print(f"🔍 Session check: {session_data}")
+    return jsonify(session_data)
+
+@app.route('/api/create_user', methods=['POST'])
+def api_create_user():
+    """Crear nuevo usuario (solo admins)"""
+    try:
+        payload = request.json
+        print(f"🔍 Create user request - Session: {dict(session)}")
+        print(f"🔍 Session username: {session.get('username')}")
+        print(f"🔍 Session is_admin: {session.get('is_admin')}")
+        
+        # Verificar sesión más detalladamente
+        if 'username' not in session:
+            print("❌ No hay username en session")
+            return jsonify({"success": False, "error": "No hay sesión activa"}), 401
+            
+        if not session.get('is_admin', False):
+            print("❌ Usuario no es admin")
+            return jsonify({"success": False, "error": "Sin privilegios de administrador"}), 401
+            
+        username = payload.get('username')
+        password = payload.get('password')
+        role = payload.get('role', 'operador')
+        
+        if not username or not password:
+            return jsonify({"success": False, "error": "Usuario y contraseña requeridos"}), 400
+            
+        print(f"✅ Creando usuario: {username} con rol: {role}")
+        result = create_user(username, password, role)
+        print(f"📝 Resultado crear usuario: {result}")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"❌ Error en create_user: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/get_profiles', methods=['GET'])
 def get_profiles():
@@ -1602,6 +1673,119 @@ def save_to_cache_endpoint():
         print(f"❌ Error guardando en caché: {e}")
         return jsonify({"success": False, "error": str(e)})
 
+# Nuevos endpoints de usuario
+@app.route('/api/users', methods=['GET'])
+def api_get_users():
+    """Obtener todos los usuarios (solo admins)"""
+    if 'username' not in session or not session.get('is_admin', False):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    
+    users = get_all_users()
+    return jsonify({"success": True, "users": users})
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+def api_delete_user(user_id):
+    """Eliminar usuario (solo admins)"""
+    if 'username' not in session or not session.get('is_admin', False):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    
+    result = delete_user(user_id)
+    return jsonify(result)
+
+@app.route('/api/users/<int:user_id>/role', methods=['PUT'])
+def api_update_user_role(user_id):
+    """Actualizar rol de usuario (solo admins)"""
+    if 'username' not in session or not session.get('is_admin', False):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    
+    data = request.get_json()
+    new_role = data.get('role')
+    result = update_user_role(user_id, new_role)
+    return jsonify(result)
+
+@app.route('/api/defects/<profile>')
+def api_get_defects(profile):
+    """Obtener defectos disponibles para un perfil"""
+    try:
+        defects = get_defects_for_profile(profile)
+        return jsonify({
+            "success": True,
+            "profile": profile,
+            "defects": defects
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/manual_analysis', methods=['POST'])
+def manual_analysis():
+    """Endpoint para análisis manual (ingreso de defectos sin imagen)"""
+    try:
+        data = request.get_json()
+        
+        # Validar datos requeridos
+        required_fields = ['user', 'profile', 'distribucion', 'guia_sii', 'lote', 'num_frutos', 'defects']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"success": False, "error": f"Campo requerido: {field}"})
+        
+        # Preparar datos para guardar
+        form_data = {
+            "user": data['user'],
+            "profile": data['profile'],
+            "distribucion": data['distribucion'],
+            "analysis_type": data['profile'].replace('_', '-'),
+            "guia_sii": data['guia_sii'],
+            "lote": data['lote'],
+            "num_frutos": int(data['num_frutos']),
+            "num_proceso": data.get('num_proceso'),
+            "id_caja": data.get('id_caja')
+        }
+        
+        # Procesar defectos manuales
+        defects_data = data['defects']
+        total_defects = sum(defects_data.values())
+        
+        analysis_data = {
+            "source_type": "manual_entry",
+            "confidence_used": 1.0  # Confianza máxima para entrada manual
+        }
+        
+        results_data = {
+            "results": defects_data,
+            "total_cherries": total_defects,
+            "confidence_used": 1.0,
+            "zones_loaded": len(defects_data),
+            "processed_image": None,
+            "detections_by_zone": {},
+            "image_size": None,
+            "zones_available": list(defects_data.keys())
+        }
+        
+        # Guardar en base de datos
+        try:
+            analysis_id, saved_to_main_db = save_analysis_result(analysis_data, form_data, results_data)
+            db_status = "saved_to_postgresql" if saved_to_main_db else "saved_to_local_cache"
+            print(f"✅ Análisis manual guardado: {db_status}, ID: {analysis_id}")
+        except Exception as e:
+            print(f"⚠️ Error guardando análisis manual: {e}")
+            analysis_id = None
+            db_status = "save_failed"
+        
+        return jsonify({
+            "success": True,
+            "results": defects_data,
+            "total_cherries": total_defects,
+            "analysis_type": "manual",
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "analysis_id": analysis_id,
+            "database_status": db_status,
+            "db_connected": DB_AVAILABLE
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en análisis manual: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
 if __name__ == '__main__':
     print("🚀 Iniciando servidor RancoQC...")
     
@@ -1618,7 +1802,19 @@ if __name__ == '__main__':
         print(f"⚠️ Error inicializando base de datos: {e}")
         print("📁 Continuando con SQLite local")
     
+    # Crear usuario administrador inicial
+    try:
+        admin_result = create_admin_user()
+        if admin_result['success']:
+            if 'Usuario administrador creado' in str(admin_result):
+                print("✅ Usuario administrador creado: admin / admin123")
+            else:
+                print("✅ Usuario administrador ya existe")
+    except Exception as e:
+        print(f"⚠️ Error creando admin inicial: {e}")
+    
     print("🌐 Accede a: http://localhost:5001")
+    print("👤 Credenciales Admin: admin / admin123")
     
     # Verificar modelo
     if os.path.exists(MODEL_PATH):
@@ -1627,4 +1823,12 @@ if __name__ == '__main__':
         print(f"❌ Modelo YOLO NO encontrado: {MODEL_PATH}")
         print("   Por favor, coloca tu archivo best.pt en la carpeta del proyecto")
     
+    # Configuración de sesiones
+    app.secret_key = 'rancoqc_secret_key_change_in_production'
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = False  # Para desarrollo local
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hora
+    
+    print("🔐 Configuración de sesiones aplicada")
     app.run(debug=True, host='0.0.0.0', port=5001)
