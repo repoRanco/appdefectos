@@ -7,224 +7,498 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
 
   <style>
-    :root{
-      --bg:#f8fafc;          /* fondo general */
-      --panel:#ffffff;        /* panel principal */
-      --panel-2:#f1f5f9;      /* secciones y encabezados */
-      --card:#ffffff;
-      --muted:#64748b;        /* texto secundario */
-      --text:#1e293b;         /* texto principal */
-      --brand:#e11d48;        /* acento rosa/rojo suave */
-      --brand-2:#f43f5e;
-      --accent:#16a34a;       /* verde */
-      --warn:#d97706;         /* ámbar */
-      --border:#e2e8f0;       /* borde gris claro */
-      --shadow:0 2px 8px rgba(0,0,0,.05);
+    :root {
+      /* Enhanced Light Theme */
+      --bg: lch(82.89% 4.7 263.66);           /* Cooler off-white */
+      --panel: hwb(0 100% 0%);        /* Pure white */
+      --panel-2: #f3f4f6;      /* Slightly darker for contrast */
+      --card: #ffffff;         /* Pure white for cards */
+      --muted: lab(16.59% 0 0);        /* Slightly darker for better readability */
+      --text: lch(33.98% 2.63 272.01);         /* Almost black for best contrast */
+      --brand: #dc2626;        /* Red for primary actions */
+      --brand-2: #ef4444;      /* Lighter red for hover states */
+      --accent: #059669;       /* Deeper green for success states */
+      --warn: #4646463f;         /* Darker amber for warnings */
+      --border: #e5e7eb;       /* Subtle border color */
+      --border-2: #d1d5db;     /* Slightly darker border for depth */
+      --shadow: 0 4px 6px -1px hwb(0 85% 0% / 0.977), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --shadow-soft: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+      --focus: 0 0 0 3px rgba(220, 38, 38, 0.15);
+      
+      /* Enhanced theme variables */
+      --hover-bg: #f0f2f5;     /* Slightly darker on hover */
+      --active-bg: #e5e7eb;    /* Active state color */
+      --header-bg: rgba(255, 255, 255, 0.95);  /* More opaque header */
+      --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+      --success-bg: #ecfdf5;   /* Light green for success states */
+      --success-text: #065f46; /* Dark green text */
+      --warning-bg: #fffbeb;   /* Light yellow for warnings */
+      --warning-text: #92400e; /* Dark yellow text */
+      --error-bg: #fef2f2;     /* Light red for errors */
+      --error-text: #b91c1c;   /* Dark red text */
     }
 
-    *{box-sizing:border-box;margin:0;padding:0}
-    html,body{
+    *{box-sizing:border-box}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    
+    html, body {
+      margin: 0;
+      padding: 0;
       background: var(--bg);
       color: var(--text);
-      font-family: "Segoe UI", Roboto, sans-serif;
-      min-height:100vh;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      min-height: 100%;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     /* Header */
-    .header{
-      position:sticky; top:0; z-index:10;
-      display:flex; align-items:center; justify-content:space-between;
-      padding:14px 24px;
-      background:#fff;
-      border-bottom:1px solid var(--border);
-      box-shadow: var(--shadow);
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 2px 0 rgba(232, 202, 202, 0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
     .header-left{display:flex;align-items:center;gap:12px}
-    .logo{height:38px;width:auto}
-    #module-title{font-size:20px;font-weight:600;color:var(--brand)}
-
-    .header-right{display:flex;align-items:center;gap:16px}
-    .db-status{
-      display:flex;align-items:center;gap:8px;
-      padding:6px 10px;
-      border-radius:8px;
-      border:1px solid var(--border);
-      background:var(--panel-2);
-      font-size:13px;
-      color:var(--muted);
+    .logo-section{display:flex;align-items:center;gap:12px}
+    .logo {
+      height: 36px;
+      width: auto;
+      object-fit: contain;
+      filter: none;
     }
-    .db-status.ok{background:#dcfce7; color:#166534; border-color:#bbf7d0;}
-    .db-status.warn{background:#fef9c3;color:#78350f;border-color:#fde68a;}
-    .db-status.err{background:#fee2e2;color:#991b1b;border-color:#fecaca;}
+    #module-title {
+      font-size: 18px;
+      margin: 0;
+      letter-spacing: 0.2px;
+      font-weight: 600;
+      color: white;
+    }
+    .header-right{display:flex;align-items:center;gap:16px}
+    .db-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 13px;
+      color: var(--muted);
+      box-shadow: var(--shadow-soft);
+    }
+    .db-status.ok { 
+      border-color: rgba(5, 150, 105, 0.2);
+      color: var(--success-text);
+      background-color: var(--success-bg);
+    }
+    
+    .db-status.warn { 
+      border-color: rgba(217, 119, 6, 0.2);
+      color: var(--warning-text);
+      background-color: var(--warning-bg);
+    }
+    
+    .db-status.err { 
+      border-color: rgba(220, 38, 38, 0.2);
+      color: var(--error-text);
+      background-color: var(--error-bg);
+    }
+    
+    .db-status.info {
+      border-color: rgba(59, 130, 246, 0.2);
+      color: #1e40af;
+      background-color: #eff6ff;
+    }
+    
+    .db-status.neutral {
+      border-color: var(--border);
+      color: var(--text);
+      background-color: var(--panel);
+    }
 
     .user-info{display:flex;align-items:center;gap:10px;color:var(--muted)}
     .current-time{font-variant-numeric:tabular-nums}
 
-    /* Layout */
-    .main-content{
-      max-width:1200px;
-      margin:24px auto;
-      padding:0 20px 60px;
+    /* Main */
+    .main-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
     }
 
     /* Buttons */
     button{font-family:inherit}
-    .btn-icon{
-      border:none; background:var(--panel-2);
-      color:var(--text); width:38px; height:38px;
-      border-radius:8px;
-      display:flex; align-items:center; justify-content:center;
-      cursor:pointer;
-      border:1px solid var(--border);
-      transition:all .2s;
+    .btn-icon {
+      border: none;
+      background: var(--panel);
+      color: var(--muted);
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      transition: all 0.15s ease;
+      box-shadow: var(--shadow-soft);
     }
-    .btn-icon:hover{background:#e2e8f0;}
+    .btn-icon:hover {
+      transform: translateY(-1px);
+      background: var(--hover-bg);
+      color: var(--text);
+    }
+    .btn-icon:focus {
+      outline: none;
+      box-shadow: var(--focus);
+    }
+    .btn-icon:active {
+      transform: translateY(0);
+      background: var(--active-bg);
+    }
 
-    .btn-primary,.btn-secondary{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:8px 14px; border-radius:8px;
-      border:1px solid transparent;
-      font-weight:600; cursor:pointer; transition:all .2s;
-      font-size:14px;
+    .btn-primary, .btn-secondary, .btn-outline {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      line-height: 1.25;
     }
-    .btn-primary{
-      background:linear-gradient(135deg, var(--brand), var(--brand-2));
-      color:#fff;
+    
+    .btn-primary {
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: white;
+      font-weight: 500;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
     }
-    .btn-primary:hover{filter:brightness(1.1)}
-    .btn-secondary{
-      background:var(--panel-2);
-      color:var(--text);
-      border:1px solid var(--border);
+    
+    .btn-primary::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+      opacity: 0;
+      transition: opacity 0.2s ease;
     }
-    .btn-secondary:hover{background:#e2e8f0;}
+    
+    .btn-primary:hover::after {
+      opacity: 1;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    
+    .btn-secondary {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+      font-weight: 500;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--hover-bg);
+      border-color: var(--border-2);
+    }
+    
+    .btn-secondary:active {
+      background: var(--active-bg);
+    }
+    
+    .btn-secondary:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(209, 213, 219, 0.5);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--hover-bg);
+      transform: translateY(-1px);
+    }
+    
+    .btn-secondary:active {
+      background: var(--active-bg);
+      transform: translateY(0);
+    }
+    
+    .btn-secondary:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Utility badges */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      background: var(--panel);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border: 1px solid;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+      white-space: nowrap;
+      line-height: 1.25;
+    }
+    
+    .badge i {
+      font-size: 0.85em;
+    }
+
+    .badge.ok { 
+      border-color: rgba(5, 150, 105, 0.2);
+      color: var(--success-text);
+      background-color: var(--success-bg);
+    }
+    
+    .badge.warn { 
+      border-color: rgba(217, 119, 6, 0.2);
+      color: var(--warning-text);
+      background-color: var(--warning-bg);
+    }
+    
+    .badge.err { 
+      border-color: rgba(220, 38, 38, 0.2);
+      color: var(--error-text);
+      background-color: var(--error-bg);
+    }
+    
+    .badge.info {
+      border-color: rgba(59, 130, 246, 0.2);
+      color: #1e40af;
+      background-color: #eff6ff;
+    }
+    
+    .badge.neutral {
+      border-color: var(--border);
+      color: var(--text);
+      background-color: var(--panel);
+    }
 
     /* Filters */
     .filters-section{
-      background: var(--panel);
+      background: linear-gradient(180deg, rgba(2,6,23,.6), rgba(2,6,23,.35));
       border:1px solid var(--border);
-      border-radius:10px;
+      border-radius:14px;
       padding:16px;
       box-shadow: var(--shadow);
     }
-    .form-group-inline{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
-    .form-group{display:flex;flex-direction:column;gap:5px;min-width:220px}
-    .form-group label{color:var(--muted);font-size:13px;font-weight:500}
+    .form-group-inline{display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end}
+    .form-group{display:flex; flex-direction:column; gap:6px; min-width:220px}
+    .form-group label{color:var(--muted); font-size:13px}
     select{
-      background:white;color:var(--text);
-      border:1px solid var(--border);
-      border-radius:8px;
-      padding:8px 12px;
-      outline:none;
+      background:rgba(2,6,23,.8); color:var(--text);
+      border:1px solid var(--border); border-radius:10px;
+      padding:9px 12px; outline:none;
     }
-    select:focus{border-color:#94a3b8;box-shadow:0 0 0 2px rgba(148,163,184,.2)}
+    select:focus{border-color:var(--border-2); box-shadow:0 0 0 3px rgba(148,163,184,.15)}
 
     /* Stats */
     .stats-section{margin:18px 0}
     .stats-grid{
-      display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
-      gap:16px;
+      display:grid; grid-template-columns: repeat(3, 1fr);
+      gap:14px;
     }
-    .stat-card{
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:10px;
-      padding:14px;
-      display:flex;align-items:center;gap:12px;
-      box-shadow:var(--shadow);
+    .stat-card {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      padding: 20px 24px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: var(--shadow-soft);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border-top: 4px solid transparent;
     }
+    
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .stat-card:nth-child(1) { border-top: 3px solid var(--brand); }
+    .stat-card:nth-child(2) { border-top: 3px solid var(--accent); }
+    .stat-card:nth-child(3) { border-top: 3px solid var(--warn); }
     .stat-icon{
-      width:42px;height:42px;
-      border-radius:8px;
+      width:48px;height:48px;border-radius:12px;
       display:flex;align-items:center;justify-content:center;
-      background:#e2e8f0;color:#1e293b;
+      background:rgba(239, 68, 68, 0.05);
+      color: var(--brand);
+      font-size: 1.4rem;
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
     }
-    .stat-info h3{margin:0;font-size:22px;color:var(--text)}
-    .stat-info p{margin:0;color:var(--muted);font-size:13px;}
+    .stat-info h3{margin:0; font-size:22px}
+    .stat-info p{margin:2px 0 0; color:var(--muted); font-size:13px}
 
-    /* History table */
+    /* History */
     .history-section{
-      margin-top:20px;
-      background:var(--panel);
+      margin-top:18px;
+      background:rgba(2,6,23,.45);
       border:1px solid var(--border);
-      border-radius:10px;
-      box-shadow:var(--shadow);
+      border-radius:14px;
       overflow:hidden;
+      box-shadow: var(--shadow);
     }
     .history-header{
-      display:flex;align-items:center;justify-content:space-between;
-      background:var(--panel-2);
-      padding:12px 16px;
-      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px; border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(15,23,42,.8), rgba(2,6,23,.4));
     }
-    .history-header h2{margin:0;display:flex;gap:8px;align-items:center;font-size:16px;color:var(--text)}
-    .history-actions{display:flex;gap:6px;align-items:center;}
+    .history-header h2{margin:0; display:flex; align-items:center; gap:10px}
+    .history-actions{display:flex; gap:8px}
 
-    .history-table-container{overflow:auto}
-    .history-table{
-      width:100%;
-      border-collapse:collapse;
-      min-width:900px;
+    /* Table */
+    .history-table-container{width:100%; overflow:auto}
+    .history-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.9375rem;
     }
-    th,td{padding:10px 14px; text-align:left; font-size:14px;}
-    thead{background: var(--panel-2);}
-    th{border-bottom:1px solid var(--border);color:var(--muted)}
-    tbody tr:nth-child(odd){background:#f9fafb}
-    tbody tr:hover{background:#e2e8f0}
-    td{border-bottom:1px solid var(--border);color:var(--text)}
-
+    
+    .history-table th {
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      font-size: 0.75rem;
+      color: var(--muted);
+      padding: 12px 16px;
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--border);
+    }
+    .history-table tbody td{
+      padding:12px 14px; border-bottom:1px solid var(--border); color:#e2e8f0;
+    }
+    .history-table tbody tr{transition: background .15s ease}
+    .history-table tbody tr:hover{background:rgba(148,163,184,.07)}
     .badge{
-      display:inline-flex;align-items:center;gap:6px;
-      padding:4px 10px;
-      border-radius:20px;
-      font-size:12px;
-      border:1px solid var(--border);
-      background:#f1f5f9;
+      display:inline-flex; align-items:center; gap:6px; padding:6px 10px;
+      border-radius:999px; font-size:12px; border:1px solid var(--border); background:rgba(2,6,23,.6)
     }
-    .badge.ok{background:#dcfce7; color:#166534;}
-    .badge.warn{background:#fef9c3; color:#92400e;}
-    .badge.err{background:#fee2e2; color:#991b1b;}
+    .badge.ok{border-color:rgba(34,197,94,.35); color:#86efac}
+    .badge.warn{border-color:rgba(245,158,11,.35); color:#fcd34d}
+    .badge.err{border-color:rgba(239,68,68,.35); color:#fecaca}
 
-    /* Loading */
-    .loading-container{display:flex;align-items:center;gap:10px;padding:16px;color:var(--muted)}
+    /* Loading / Empty / Error states */
+    .loading-container{display:flex; gap:12px; align-items:center; padding:18px; color:var(--muted)}
     .spinner{
-      width:18px;height:18px;border:3px solid #e2e8f0;border-top-color:var(--brand);
-      border-radius:50%;animation:spin 1s linear infinite;
+      width:18px;height:18px;border:3px solid rgba(148,163,184,.25);
+      border-top-color:#e5e7eb;border-radius:50%; animation:spin 1s linear infinite
     }
     @keyframes spin{to{transform:rotate(360deg)}}
 
-    /* No results */
-    .no-results{text-align:center;padding:40px 20px;color:var(--muted);}
-    .no-results i{font-size:26px;margin-bottom:6px;color:#94a3b8;}
+    .no-results{
+      text-align:center; padding:40px 14px; color:var(--muted)
+    }
+    .no-results i{font-size:28px; margin-bottom:6px; color:#94a3b8}
+
+    .error-state {
+      text-align: center;
+      padding: 20px 16px;
+      color: #b91c1c;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      margin: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .error-state i {
+      font-size: 24px;
+      color: #ef4444;
+    }
 
     /* Modal */
     .modal{
-      position:fixed;inset:0;display:none;align-items:center;justify-content:center;
-      background:rgba(0,0,0,.4);
-      z-index:50;
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.55); backdrop-filter: blur(2px); z-index:50;
     }
-    .modal.open{display:flex;}
+    .modal.open{display:flex}
     .modal-content{
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:10px;
-      width:min(800px,90vw);
-      box-shadow:var(--shadow);
+      width:min(960px, 92vw);
+      background:linear-gradient(180deg, rgba(2,6,23,.9), rgba(2,6,23,.8));
+      border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow: var(--shadow)
     }
-    .modal-header,.modal-footer{
-      padding:12px 16px;
-      border-bottom:1px solid var(--border);
-      display:flex;align-items:center;justify-content:space-between;
+    .modal-header, .modal-footer{
+      padding:14px 16px; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between
     }
-    .modal-footer{border-bottom:none;border-top:1px solid var(--border);}
-    .modal-body{padding:16px;}
+    .modal-footer{border-bottom:none; border-top:1px solid var(--border)}
+    .modal-body{padding:16px}
+    .close-btn{background:transparent; border:none; color:#e2e8f0; cursor:pointer; font-size:18px}
+    .details-grid{
+      display:grid; grid-template-columns: 1.2fr .8fr; gap:16px
+    }
+    .details-image img{
+      width:100%; height:auto; border-radius:10px; border:1px solid var(--border)
+    }
 
-    .close-btn{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;}
-    .details-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-    .details-image img{width:100%;border-radius:8px;border:1px solid var(--border);}
-
-    @media (max-width: 768px){
-      .details-grid{grid-template-columns:1fr;}
+    /* Responsive */
+    @media (max-width: 980px){
+      .stats-grid{grid-template-columns: 1fr}
+      .details-grid{grid-template-columns: 1fr}
+      .form-group{min-width:160px}
+      .logo{height:32px}
+      .history-table{min-width:720px}
     }
   </style>
 </head>
@@ -232,12 +506,17 @@
   <!-- Header -->
   <header class="header">
     <div class="header-left">
-      <button class="btn-icon" onclick="goBack()"><i class="fas fa-arrow-left"></i></button>
-      <img src="../public/LogoColor.ddc5d2c8.png" alt="RancoQC" class="logo">
-      <h1 id="module-title">Historial de Análisis</h1>
+      <button class="btn-icon" onclick="goBack()" aria-label="Volver">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <div class="logo-section">
+        <img src="../public/LogoColor.ddc5d2c8.png" alt="RancoQC" class="logo">
+        <h1 id="module-title">Historial de Análisis</h1>
+      </div>
     </div>
+
     <div class="header-right">
-      <div class="db-status" id="db-status">
+      <div class="db-status" id="db-status" aria-live="polite">
         <i class="fas fa-database"></i>
         <span id="db-status-text">Verificando...</span>
       </div>
@@ -248,13 +527,16 @@
     </div>
   </header>
 
+  <!-- Contenido Principal -->
   <main class="main-content">
     <!-- Filtros -->
-    <section class="filters-section">
+    <section class="filters-section" aria-label="Filtros de historial">
       <div class="form-group-inline">
         <div class="form-group">
           <label for="filter-user">Usuario:</label>
-          <select id="filter-user"><option value="">Todos los usuarios</option></select>
+          <select id="filter-user">
+            <option value="">Todos los usuarios</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="filter-type">Tipo de Análisis:</label>
@@ -273,44 +555,77 @@
             <option value="100">Últimos 100</option>
           </select>
         </div>
-        <button class="btn-primary" onclick="loadHistory()"><i class="fas fa-search"></i>Buscar</button>
-        <button class="btn-secondary" onclick="syncPendingData()" id="sync-btn"><i class="fas fa-sync-alt"></i>Sincronizar</button>
+        <button class="btn-primary" onclick="loadHistory()" id="btn-search">
+          <i class="fas fa-search"></i>
+          Buscar
+        </button>
+        <button class="btn-secondary" onclick="syncPendingData()" id="sync-btn">
+          <i class="fas fa-sync-alt"></i>
+          Sincronizar
+        </button>
       </div>
     </section>
 
-    <!-- Stats -->
-    <section class="stats-section" id="stats-section">
+    <!-- Estadísticas -->
+    <section class="stats-section" id="stats-section" style="display: none;">
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon"><i class="fas fa-chart-bar"></i></div>
-          <div class="stat-info"><h3 id="total-records">0</h3><p>Registros Totales</p></div>
+        <div class="stat-card" aria-live="polite">
+          <div class="stat-icon">
+            <i class="fas fa-chart-bar"></i>
+          </div>
+          <div class="stat-info">
+            <h3 id="total-records">0</h3>
+            <p>Registros Totales</p>
+          </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon"><i class="fas fa-database"></i></div>
-          <div class="stat-info"><h3 id="synced-records">0</h3><p>Sincronizados</p></div>
+        <div class="stat-card" aria-live="polite">
+          <div class="stat-icon">
+            <i class="fas fa-database"></i>
+          </div>
+          <div class="stat-info">
+            <h3 id="synced-records">0</h3>
+            <p>Sincronizados</p>
+          </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon"><i class="fas fa-clock"></i></div>
-          <div class="stat-info"><h3 id="pending-records">0</h3><p>Pendientes</p></div>
+        <div class="stat-card" aria-live="polite">
+          <div class="stat-icon">
+            <i class="fas a-clock"></i>
+          </div>
+          <div class="stat-info">
+            <h3 id="pending-records">0</h3>
+            <p>Pendientes</p>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- Historial -->
-    <section class="history-section">
+    <section class="history-section" aria-label="Tabla de historial">
       <div class="history-header">
-        <h2><i class="fas fa-history"></i>Historial de Análisis</h2>
+        <h2>
+          <i class="fas fa-history"></i>
+          Historial de Análisis
+        </h2>
         <div class="history-actions">
-          <button class="btn-secondary" onclick="exportHistoryToExcel()"><i class="fas fa-file-excel"></i> Exportar</button>
-          <button class="btn-secondary" onclick="clearSyncedCache()"><i class="fas fa-trash"></i> Limpiar Caché</button>
+          <button class="btn-secondary" onclick="exportHistoryToExcel()" id="export-btn">
+            <i class="fas fa-file-excel"></i>
+            Exportar Excel
+          </button>
+          <button class="btn-secondary" onclick="clearSyncedCache()" id="clear-cache-btn">
+            <i class="fas fa-trash"></i>
+            Limpiar Caché
+          </button>
         </div>
       </div>
 
-      <div class="loading-container" id="history-loading" style="display:none;">
-        <div class="spinner"></div><p>Cargando historial...</p>
+      <!-- Loading -->
+      <div class="loading-container" id="history-loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Cargando historial...</p>
       </div>
 
-      <div class="history-table-container">
+      <!-- Tabla de Historial -->
+      <div class="history-table-container" id="history-table-container">
         <table class="history-table" id="history-table">
           <thead>
             <tr>
@@ -324,38 +639,108 @@
               <th>Acciones</th>
             </tr>
           </thead>
-          <tbody id="history-tbody"></tbody>
+          <tbody id="history-tbody">
+            <!-- Los datos se cargarán dinámicamente -->
+          </tbody>
         </table>
       </div>
 
-      <div class="no-results" id="no-results" style="display:none;">
+      <!-- Sin resultados -->
+      <div class="no-results" id="no-results" style="display: none;">
         <i class="fas fa-search"></i>
         <h3>No se encontraron registros</h3>
-        <p>Prueba ajustando los filtros.</p>
+        <p>Prueba ajustando los filtros de búsqueda</p>
+      </div>
+
+      <!-- Error -->
+      <div class="error-state" id="error-state" style="display:none;">
+        <i class="fas fa-triangle-exclamation"></i>
+        <p id="error-message">Ocurrió un error al cargar el historial.</p>
       </div>
     </section>
   </main>
 
-  <!-- Modal detalles -->
-  <div id="details-modal" class="modal">
+  <!-- Modal de Detalles -->
+  <div id="details-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="details-title">
     <div class="modal-content">
       <div class="modal-header">
-        <h2><i class="fas fa-info-circle"></i> Detalles del Análisis</h2>
-        <button class="close-btn" onclick="closeDetailsModal()"><i class="fas fa-times"></i></button>
+        <h2 id="details-title">
+          <i class="fas fa-info-circle"></i>
+          Detalles del Análisis
+        </h2>
+        <button class="close-btn" onclick="closeDetailsModal()" aria-label="Cerrar">
+          <i class="fas fa-times"></i>
+        </button>
       </div>
       <div class="modal-body">
-        <div class="details-grid" id="details-content"></div>
-        <div class="details-image" id="details-image-container" style="display:none;">
+        <div class="details-grid" id="details-content">
+          <!-- Contenido se carga dinámicamente -->
+        </div>
+        <div class="details-image" id="details-image-container" style="display: none;">
           <img id="details-image" alt="Imagen del análisis">
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeDetailsModal()">Cerrar</button>
-        <button class="btn-primary" onclick="downloadAnalysisReport()"><i class="fas fa-download"></i> Descargar</button>
+        <button class="btn-primary" onclick="downloadAnalysisReport()" id="download-report-btn">
+          <i class="fas fa-download"></i>
+          Descargar Reporte
+        </button>
       </div>
     </div>
   </div>
 
+  <!-- Modal de Confirmación -->
+  <div id="confirm-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="confirm-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="confirm-title">
+          <i class="fas fa-exclamation-triangle"></i>
+          Confirmar Acción
+        </h2>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-message">¿Estás seguro de que deseas realizar esta acción?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeConfirmModal()">Cancelar</button>
+        <button class="btn-primary" onclick="confirmAction()" id="confirm-action-btn">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    // Hooks no intrusivos para mejorar UX al cargar datos (history.js puede ignorarlos si ya maneja esto)
+    const $loading = () => document.getElementById('history-loading');
+    const $tbody = () => document.getElementById('history-tbody');
+    const $noRes = () => document.getElementById('no-results');
+    const $err = () => document.getElementById('error-state');
+    const $errMsg = () => document.getElementById('error-message');
+    const $btnSearch = () => document.getElementById('btn-search');
+
+    // Exponemos funciones opcionales que history.js puede llamar si quiere
+    window.historyUI = {
+      start: () => {
+        $err().style.display = 'none';
+        $noRes().style.display = 'none';
+        $tbody().innerHTML = '';
+        $loading().style.display = 'flex';
+        $btnSearch().disabled = true;
+      },
+      success: (hasRows) => {
+        $loading().style.display = 'none';
+        $btnSearch().disabled = false;
+        $noRes().style.display = hasRows ? 'none' : 'block';
+      },
+      error: (message = 'Ocurrió un error al cargar el historial.') => {
+        $loading().style.display = 'none';
+        $btnSearch().disabled = false;
+        $errMsg().textContent = message;
+        $err().style.display = 'block';
+      }
+    };
+  </script>
   <script src="/js/history.js"></script>
 </body>
 </html>
