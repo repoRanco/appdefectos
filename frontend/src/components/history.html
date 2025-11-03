@@ -8,205 +8,223 @@
 
   <style>
     :root{
-      --bg:#0f172a;           /* slate-900 */
-      --panel:#111827;        /* gray-900 */
-      --panel-2:#0b1220;      /* darker */
-      --card:#0b1324;
-      --muted:#94a3b8;        /* slate-400 */
-      --text:#e5e7eb;         /* gray-200 */
-      --brand:#dc2626;        /* red-600 */
-      --brand-2:#ef4444;      /* red-500 */
-      --accent:#22c55e;       /* green-500 */
-      --warn:#f59e0b;         /* amber-500 */
-      --border:#1f2937;       /* gray-800 */
-      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --bg:#f8fafc;          /* fondo general */
+      --panel:#ffffff;        /* panel principal */
+      --panel-2:#f1f5f9;      /* secciones y encabezados */
+      --card:#ffffff;
+      --muted:#64748b;        /* texto secundario */
+      --text:#1e293b;         /* texto principal */
+      --brand:#e11d48;        /* acento rosa/rojo suave */
+      --brand-2:#f43f5e;
+      --accent:#16a34a;       /* verde */
+      --warn:#d97706;         /* ámbar */
+      --border:#e2e8f0;       /* borde gris claro */
+      --shadow:0 2px 8px rgba(0,0,0,.05);
     }
 
-    *{box-sizing:border-box}
+    *{box-sizing:border-box;margin:0;padding:0}
     html,body{
-      margin:0; padding:0;
-      background: radial-gradient(1200px 1200px at -10% -20%, #1f2937 0%, #0f172a 40%, #0b1220 100%);
-      color:var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
-      min-height:100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Roboto, sans-serif;
+      min-height:100vh;
     }
 
     /* Header */
     .header{
-      position:sticky; top:0; z-index:20;
+      position:sticky; top:0; z-index:10;
       display:flex; align-items:center; justify-content:space-between;
-      padding:14px 20px;
-      background: linear-gradient(180deg, rgba(17,24,39,0.95), rgba(17,24,39,0.85));
+      padding:14px 24px;
+      background:#fff;
       border-bottom:1px solid var(--border);
-      backdrop-filter: blur(6px);
+      box-shadow: var(--shadow);
     }
     .header-left{display:flex;align-items:center;gap:12px}
-    .logo-section{display:flex;align-items:center;gap:12px}
-    .logo{height:40px;width:auto;object-fit:contain;filter:drop-shadow(0 6px 12px rgba(0,0,0,.45))}
-    #module-title{font-size:20px;margin:0}
+    .logo{height:38px;width:auto}
+    #module-title{font-size:20px;font-weight:600;color:var(--brand)}
+
     .header-right{display:flex;align-items:center;gap:16px}
     .db-status{
       display:flex;align-items:center;gap:8px;
-      padding:6px 10px;border:1px solid var(--border);
-      border-radius:10px;background:rgba(2,6,23,.6);
-      font-size:13px;color:var(--muted)
+      padding:6px 10px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:var(--panel-2);
+      font-size:13px;
+      color:var(--muted);
     }
-    .db-status.ok{border-color:rgba(34,197,94,.35); color:#bbf7d0}
-    .db-status.warn{border-color:rgba(245,158,11,.35); color:#fde68a}
-    .db-status.err{border-color:rgba(239,68,68,.35); color:#fecaca}
+    .db-status.ok{background:#dcfce7; color:#166534; border-color:#bbf7d0;}
+    .db-status.warn{background:#fef9c3;color:#78350f;border-color:#fde68a;}
+    .db-status.err{background:#fee2e2;color:#991b1b;border-color:#fecaca;}
 
     .user-info{display:flex;align-items:center;gap:10px;color:var(--muted)}
     .current-time{font-variant-numeric:tabular-nums}
 
-    /* Main */
+    /* Layout */
     .main-content{
       max-width:1200px;
       margin:24px auto;
-      padding:0 18px 60px;
+      padding:0 20px 60px;
     }
 
     /* Buttons */
+    button{font-family:inherit}
     .btn-icon{
-      border:none; background:rgba(2,6,23,.7);
-      color:var(--text); width:38px; height:38px; border-radius:10px;
-      display:inline-flex; align-items:center; justify-content:center;
-      cursor:pointer; border:1px solid var(--border);
-      transition: all .18s ease;
+      border:none; background:var(--panel-2);
+      color:var(--text); width:38px; height:38px;
+      border-radius:8px;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer;
+      border:1px solid var(--border);
+      transition:all .2s;
     }
-    .btn-icon:hover{transform:translateY(-1px); background:rgba(2,6,23,.9)}
-    .btn-primary, .btn-secondary{
+    .btn-icon:hover{background:#e2e8f0;}
+
+    .btn-primary,.btn-secondary{
       display:inline-flex; align-items:center; gap:8px;
-      padding:10px 14px; border-radius:10px; border:1px solid transparent;
-      font-weight:600; cursor:pointer; transition: all .18s ease;
+      padding:8px 14px; border-radius:8px;
+      border:1px solid transparent;
+      font-weight:600; cursor:pointer; transition:all .2s;
+      font-size:14px;
     }
-    .btn-primary{background:linear-gradient(135deg, var(--brand), var(--brand-2)); color:white; box-shadow: var(--shadow)}
-    .btn-primary:hover{filter:brightness(1.05); transform:translateY(-1px)}
-    .btn-secondary{background:rgba(2,6,23,.7); color:var(--text); border-color:var(--border)}
-    .btn-secondary:hover{background:rgba(2,6,23,.9)}
+    .btn-primary{
+      background:linear-gradient(135deg, var(--brand), var(--brand-2));
+      color:#fff;
+    }
+    .btn-primary:hover{filter:brightness(1.1)}
+    .btn-secondary{
+      background:var(--panel-2);
+      color:var(--text);
+      border:1px solid var(--border);
+    }
+    .btn-secondary:hover{background:#e2e8f0;}
 
     /* Filters */
     .filters-section{
-      background: linear-gradient(180deg, rgba(2,6,23,.6), rgba(2,6,23,.35));
+      background: var(--panel);
       border:1px solid var(--border);
-      border-radius:14px;
+      border-radius:10px;
       padding:16px;
       box-shadow: var(--shadow);
     }
-    .form-group-inline{display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end}
-    .form-group{display:flex; flex-direction:column; gap:6px; min-width:220px}
-    .form-group label{color:var(--muted); font-size:13px}
+    .form-group-inline{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+    .form-group{display:flex;flex-direction:column;gap:5px;min-width:220px}
+    .form-group label{color:var(--muted);font-size:13px;font-weight:500}
     select{
-      background:rgba(2,6,23,.8); color:var(--text);
-      border:1px solid var(--border); border-radius:10px;
-      padding:9px 12px; outline:none;
+      background:white;color:var(--text);
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:8px 12px;
+      outline:none;
     }
-    select:focus{border-color:#334155; box-shadow:0 0 0 3px rgba(148,163,184,.15)}
+    select:focus{border-color:#94a3b8;box-shadow:0 0 0 2px rgba(148,163,184,.2)}
 
     /* Stats */
     .stats-section{margin:18px 0}
     .stats-grid{
-      display:grid; grid-template-columns: repeat(3, 1fr);
-      gap:14px;
+      display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+      gap:16px;
     }
     .stat-card{
-      display:flex; gap:12px; align-items:center;
-      padding:14px; border:1px solid var(--border); border-radius:12px;
-      background: radial-gradient(600px 400px at -10% -20%, rgba(220,38,38,.15), rgba(2,6,23,.35) 60%);
-    }
-    .stat-card:nth-child(2){background: radial-gradient(600px 400px at -10% -20%, rgba(34,197,94,.15), rgba(2,6,23,.35) 60%)}
-    .stat-card:nth-child(3){background: radial-gradient(600px 400px at -10% -20%, rgba(245,158,11,.15), rgba(2,6,23,.35) 60%)}
-    .stat-icon{
-      width:40px;height:40px;border-radius:10px;
-      display:flex;align-items:center;justify-content:center;
-      background:rgba(0,0,0,.25); border:1px solid var(--border);
-    }
-    .stat-info h3{margin:0; font-size:22px}
-    .stat-info p{margin:2px 0 0; color:var(--muted); font-size:13px}
-
-    /* History */
-    .history-section{
-      margin-top:18px;
-      background:rgba(2,6,23,.45);
+      background:var(--panel);
       border:1px solid var(--border);
-      border-radius:14px;
+      border-radius:10px;
+      padding:14px;
+      display:flex;align-items:center;gap:12px;
+      box-shadow:var(--shadow);
+    }
+    .stat-icon{
+      width:42px;height:42px;
+      border-radius:8px;
+      display:flex;align-items:center;justify-content:center;
+      background:#e2e8f0;color:#1e293b;
+    }
+    .stat-info h3{margin:0;font-size:22px;color:var(--text)}
+    .stat-info p{margin:0;color:var(--muted);font-size:13px;}
+
+    /* History table */
+    .history-section{
+      margin-top:20px;
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:10px;
+      box-shadow:var(--shadow);
       overflow:hidden;
-      box-shadow: var(--shadow);
     }
     .history-header{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:16px; border-bottom:1px solid var(--border);
-      background:linear-gradient(180deg, rgba(15,23,42,.8), rgba(2,6,23,.4));
+      display:flex;align-items:center;justify-content:space-between;
+      background:var(--panel-2);
+      padding:12px 16px;
+      border-bottom:1px solid var(--border);
     }
-    .history-header h2{margin:0; display:flex; align-items:center; gap:10px}
-    .history-actions{display:flex; gap:8px}
+    .history-header h2{margin:0;display:flex;gap:8px;align-items:center;font-size:16px;color:var(--text)}
+    .history-actions{display:flex;gap:6px;align-items:center;}
 
-    /* Table */
-    .history-table-container{width:100%; overflow:auto}
+    .history-table-container{overflow:auto}
     .history-table{
-      width:100%; border-collapse:separate; border-spacing:0; min-width:900px;
+      width:100%;
+      border-collapse:collapse;
+      min-width:900px;
     }
-    .history-table thead th{
-      text-align:left; font-weight:700; font-size:13px; letter-spacing:.02em;
-      padding:12px 14px; color:#cbd5e1; background:rgba(2,6,23,.7);
-      position:sticky; top:0; z-index:5; border-bottom:1px solid var(--border);
-    }
-    .history-table tbody td{
-      padding:12px 14px; border-bottom:1px solid var(--border); color:#e2e8f0;
-    }
-    .history-table tbody tr:hover{background:rgba(148,163,184,.07)}
+    th,td{padding:10px 14px; text-align:left; font-size:14px;}
+    thead{background: var(--panel-2);}
+    th{border-bottom:1px solid var(--border);color:var(--muted)}
+    tbody tr:nth-child(odd){background:#f9fafb}
+    tbody tr:hover{background:#e2e8f0}
+    td{border-bottom:1px solid var(--border);color:var(--text)}
+
     .badge{
-      display:inline-flex; align-items:center; gap:6px; padding:6px 10px;
-      border-radius:999px; font-size:12px; border:1px solid var(--border); background:rgba(2,6,23,.6)
+      display:inline-flex;align-items:center;gap:6px;
+      padding:4px 10px;
+      border-radius:20px;
+      font-size:12px;
+      border:1px solid var(--border);
+      background:#f1f5f9;
     }
-    .badge.ok{border-color:rgba(34,197,94,.35); color:#86efac}
-    .badge.warn{border-color:rgba(245,158,11,.35); color:#fcd34d}
-    .badge.err{border-color:rgba(239,68,68,.35); color:#fecaca}
+    .badge.ok{background:#dcfce7; color:#166534;}
+    .badge.warn{background:#fef9c3; color:#92400e;}
+    .badge.err{background:#fee2e2; color:#991b1b;}
 
     /* Loading */
-    .loading-container{display:flex; gap:12px; align-items:center; padding:18px; color:var(--muted)}
+    .loading-container{display:flex;align-items:center;gap:10px;padding:16px;color:var(--muted)}
     .spinner{
-      width:18px;height:18px;border:3px solid rgba(148,163,184,.25);
-      border-top-color:#e5e7eb;border-radius:50%; animation:spin 1s linear infinite
+      width:18px;height:18px;border:3px solid #e2e8f0;border-top-color:var(--brand);
+      border-radius:50%;animation:spin 1s linear infinite;
     }
     @keyframes spin{to{transform:rotate(360deg)}}
 
     /* No results */
-    .no-results{
-      text-align:center; padding:40px 14px; color:var(--muted)
-    }
-    .no-results i{font-size:28px; margin-bottom:6px; color:#94a3b8}
+    .no-results{text-align:center;padding:40px 20px;color:var(--muted);}
+    .no-results i{font-size:26px;margin-bottom:6px;color:#94a3b8;}
 
     /* Modal */
     .modal{
-      position:fixed; inset:0; display:none; align-items:center; justify-content:center;
-      background:rgba(0,0,0,.55); backdrop-filter: blur(2px); z-index:50;
+      position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.4);
+      z-index:50;
     }
-    .modal.open{display:flex}
+    .modal.open{display:flex;}
     .modal-content{
-      width:min(960px, 92vw);
-      background:linear-gradient(180deg, rgba(2,6,23,.9), rgba(2,6,23,.8));
-      border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow: var(--shadow)
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:10px;
+      width:min(800px,90vw);
+      box-shadow:var(--shadow);
     }
-    .modal-header, .modal-footer{
-      padding:14px 16px; border-bottom:1px solid var(--border);
-      display:flex; align-items:center; justify-content:space-between
+    .modal-header,.modal-footer{
+      padding:12px 16px;
+      border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;
     }
-    .modal-footer{border-bottom:none; border-top:1px solid var(--border)}
-    .modal-body{padding:16px}
-    .close-btn{background:transparent; border:none; color:#e2e8f0; cursor:pointer; font-size:18px}
-    .details-grid{
-      display:grid; grid-template-columns: 1.2fr .8fr; gap:16px
-    }
-    .details-image img{
-      width:100%; height:auto; border-radius:10px; border:1px solid var(--border)
-    }
+    .modal-footer{border-bottom:none;border-top:1px solid var(--border);}
+    .modal-body{padding:16px;}
 
-    /* Responsive */
-    @media (max-width: 980px){
-      .stats-grid{grid-template-columns: 1fr}
-      .details-grid{grid-template-columns: 1fr}
-      .form-group{min-width:160px}
-      .logo{height:32px}
+    .close-btn{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;}
+    .details-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    .details-image img{width:100%;border-radius:8px;border:1px solid var(--border);}
+
+    @media (max-width: 768px){
+      .details-grid{grid-template-columns:1fr;}
     }
   </style>
 </head>
@@ -214,15 +232,10 @@
   <!-- Header -->
   <header class="header">
     <div class="header-left">
-      <button class="btn-icon" onclick="goBack()">
-        <i class="fas fa-arrow-left"></i>
-      </button>
-      <div class="logo-section">
-        <img src="../public/LogoColor.ddc5d2c8.png" alt="RancoQC" class="logo">
-        <h1 id="module-title">Historial de Análisis</h1>
-      </div>
+      <button class="btn-icon" onclick="goBack()"><i class="fas fa-arrow-left"></i></button>
+      <img src="../public/LogoColor.ddc5d2c8.png" alt="RancoQC" class="logo">
+      <h1 id="module-title">Historial de Análisis</h1>
     </div>
-
     <div class="header-right">
       <div class="db-status" id="db-status">
         <i class="fas fa-database"></i>
@@ -235,16 +248,13 @@
     </div>
   </header>
 
-  <!-- Contenido Principal -->
   <main class="main-content">
     <!-- Filtros -->
     <section class="filters-section">
       <div class="form-group-inline">
         <div class="form-group">
           <label for="filter-user">Usuario:</label>
-          <select id="filter-user">
-            <option value="">Todos los usuarios</option>
-          </select>
+          <select id="filter-user"><option value="">Todos los usuarios</option></select>
         </div>
         <div class="form-group">
           <label for="filter-type">Tipo de Análisis:</label>
@@ -263,46 +273,25 @@
             <option value="100">Últimos 100</option>
           </select>
         </div>
-        <button class="btn-primary" onclick="loadHistory()">
-          <i class="fas fa-search"></i>
-          Buscar
-        </button>
-        <button class="btn-secondary" onclick="syncPendingData()" id="sync-btn">
-          <i class="fas fa-sync-alt"></i>
-          Sincronizar
-        </button>
+        <button class="btn-primary" onclick="loadHistory()"><i class="fas fa-search"></i>Buscar</button>
+        <button class="btn-secondary" onclick="syncPendingData()" id="sync-btn"><i class="fas fa-sync-alt"></i>Sincronizar</button>
       </div>
     </section>
 
-    <!-- Estadísticas -->
-    <section class="stats-section" id="stats-section" style="display: none;">
+    <!-- Stats -->
+    <section class="stats-section" id="stats-section">
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="stat-icon">
-            <i class="fas fa-chart-bar"></i>
-          </div>
-          <div class="stat-info">
-            <h3 id="total-records">0</h3>
-            <p>Registros Totales</p>
-          </div>
+          <div class="stat-icon"><i class="fas fa-chart-bar"></i></div>
+          <div class="stat-info"><h3 id="total-records">0</h3><p>Registros Totales</p></div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">
-            <i class="fas fa-database"></i>
-          </div>
-          <div class="stat-info">
-            <h3 id="synced-records">0</h3>
-            <p>Sincronizados</p>
-          </div>
+          <div class="stat-icon"><i class="fas fa-database"></i></div>
+          <div class="stat-info"><h3 id="synced-records">0</h3><p>Sincronizados</p></div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">
-            <i class="fas fa-clock"></i>
-          </div>
-          <div class="stat-info">
-            <h3 id="pending-records">0</h3>
-            <p>Pendientes</p>
-          </div>
+          <div class="stat-icon"><i class="fas fa-clock"></i></div>
+          <div class="stat-info"><h3 id="pending-records">0</h3><p>Pendientes</p></div>
         </div>
       </div>
     </section>
@@ -310,30 +299,18 @@
     <!-- Historial -->
     <section class="history-section">
       <div class="history-header">
-        <h2>
-          <i class="fas fa-history"></i>
-          Historial de Análisis
-        </h2>
+        <h2><i class="fas fa-history"></i>Historial de Análisis</h2>
         <div class="history-actions">
-          <button class="btn-secondary" onclick="exportHistoryToExcel()" id="export-btn">
-            <i class="fas fa-file-excel"></i>
-            Exportar Excel
-          </button>
-          <button class="btn-secondary" onclick="clearSyncedCache()" id="clear-cache-btn">
-            <i class="fas fa-trash"></i>
-            Limpiar Caché
-          </button>
+          <button class="btn-secondary" onclick="exportHistoryToExcel()"><i class="fas fa-file-excel"></i> Exportar</button>
+          <button class="btn-secondary" onclick="clearSyncedCache()"><i class="fas fa-trash"></i> Limpiar Caché</button>
         </div>
       </div>
 
-      <!-- Loading -->
-      <div class="loading-container" id="history-loading" style="display: none;">
-        <div class="spinner"></div>
-        <p>Cargando historial...</p>
+      <div class="loading-container" id="history-loading" style="display:none;">
+        <div class="spinner"></div><p>Cargando historial...</p>
       </div>
 
-      <!-- Tabla de Historial -->
-      <div class="history-table-container" id="history-table-container">
+      <div class="history-table-container">
         <table class="history-table" id="history-table">
           <thead>
             <tr>
@@ -347,71 +324,38 @@
               <th>Acciones</th>
             </tr>
           </thead>
-          <tbody id="history-tbody">
-            <!-- Los datos se cargarán dinámicamente -->
-          </tbody>
+          <tbody id="history-tbody"></tbody>
         </table>
       </div>
 
-      <!-- Sin resultados -->
-      <div class="no-results" id="no-results" style="display: none;">
+      <div class="no-results" id="no-results" style="display:none;">
         <i class="fas fa-search"></i>
         <h3>No se encontraron registros</h3>
-        <p>Prueba ajustando los filtros de búsqueda</p>
+        <p>Prueba ajustando los filtros.</p>
       </div>
     </section>
   </main>
 
-  <!-- Modal de Detalles -->
+  <!-- Modal detalles -->
   <div id="details-modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>
-          <i class="fas fa-info-circle"></i>
-          Detalles del Análisis
-        </h2>
-        <button class="close-btn" onclick="closeDetailsModal()">
-          <i class="fas fa-times"></i>
-        </button>
+        <h2><i class="fas fa-info-circle"></i> Detalles del Análisis</h2>
+        <button class="close-btn" onclick="closeDetailsModal()"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body">
-        <div class="details-grid" id="details-content">
-          <!-- Contenido se carga dinámicamente -->
-        </div>
-        <div class="details-image" id="details-image-container" style="display: none;">
+        <div class="details-grid" id="details-content"></div>
+        <div class="details-image" id="details-image-container" style="display:none;">
           <img id="details-image" alt="Imagen del análisis">
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeDetailsModal()">Cerrar</button>
-        <button class="btn-primary" onclick="downloadAnalysisReport()" id="download-report-btn">
-          <i class="fas fa-download"></i>
-          Descargar Reporte
-        </button>
+        <button class="btn-primary" onclick="downloadAnalysisReport()"><i class="fas fa-download"></i> Descargar</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal de Confirmación -->
-  <div id="confirm-modal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>
-          <i class="fas fa-exclamation-triangle"></i>
-          Confirmar Acción
-        </h2>
-      </div>
-      <div class="modal-body">
-        <p id="confirm-message">¿Estás seguro de que deseas realizar esta acción?</p>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeConfirmModal()">Cancelar</button>
-        <button class="btn-primary" onclick="confirmAction()" id="confirm-action-btn">Confirmar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scripts -->
   <script src="/js/history.js"></script>
 </body>
 </html>

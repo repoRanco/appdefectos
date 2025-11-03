@@ -167,6 +167,12 @@ def create_tables():
         print("✅ Tablas creadas en base de datos local")
     except Exception as e:
         print(f"⚠️ Error creando tablas locales: {e}")
+        
+def is_sqlite():
+    try:
+        return (not DB_AVAILABLE) or ('sqlite' in str(engine.url))
+    except Exception:
+        return True
 
 def test_db_connection():
     """Probar conexión a base de datos"""
@@ -613,6 +619,158 @@ def get_defects_for_profile(profile):
     }
     
     return defects_by_profile.get(profile, defects_by_profile['qc_recepcion'])
+
+
+def get_analysis_results(query, params=None):
+    """
+    Ejecuta una consulta SQL y devuelve los resultados como una lista de diccionarios.
+    
+    Args:
+        query (str): Consulta SQL con parámetros marcados como ? o %s
+        params (tuple, optional): Parámetros para la consulta SQL
+        
+    Returns:
+        list: Lista de diccionarios con los resultados
+    """
+    if params is None:
+        params = ()
+    
+    # Convertir a tupla si es necesario
+    if not isinstance(params, (tuple, list)):
+        params = (params,)
+        
+    try:
+        if not DB_AVAILABLE or 'sqlite' in str(engine.url):
+            # Usar SQLite
+            import sqlite3
+            conn = sqlite3.connect('local_cache.db')
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+        else:
+            # Usar PostgreSQL a través de SQLAlchemy
+            conn = engine.raw_connection()
+            cursor = conn.cursor()
+        
+        # Ejecutar consulta
+        cursor.execute(query, params)
+        
+        # Obtener resultados como lista de diccionarios
+        columns = [column[0] for column in cursor.description] if cursor.description else []
+        results = []
+        
+        for row in cursor.fetchall():
+            if hasattr(row, '_asdict'):
+                # Si es un objeto Row de SQLAlchemy
+                row_dict = row._asdict()
+            elif hasattr(row, 'keys'):
+                # Si es un objeto Row de sqlite3
+                row_dict = {key: row[key] for key in row.keys()}
+            else:
+                # Si es una tupla normal
+                row_dict = {}
+                for i, value in enumerate(row):
+                    if i < len(columns):
+                        row_dict[columns[i]] = value
+            
+            # Convertir fechas a string si es necesario
+            for key, value in row_dict.items():
+                if isinstance(value, datetime):
+                    row_dict[key] = value.strftime('%Y-%m-%d %H:%M:%S')
+                
+            results.append(row_dict)
+            
+        return results
+        
+    except Exception as e:
+        print(f"Error en get_analysis_results: {e}")
+        # En caso de error, devolver datos de ejemplo para desarrollo
+        if not DB_AVAILABLE or 'test' in str(e).lower():
+            print("⚠️ Usando datos de ejemplo debido a error en la base de datos")
+            return [
+                {
+                    'id': 1,
+                    'timestamp': '2023-11-01 10:30:00',
+                    'user_name': 'admin',
+                    'analysis_type': 'qc_recepcion',
+                    'profile': 'perfil1',
+                    'distribucion': 'roja',
+                    'guia_sii': 'G12345',
+                    'lote': 'L001',
+                    'num_frutos': 100,
+                    'total_detections': 5,
+                    'zones_analyzed': 4,
+                    'confidence_used': 0.8,
+                    'results_json': '{"zona1": {"defect1": 2, "defect2": 1}, "zona2": {"defect1": 1, "defect3": 1}}',
+                    'detections_by_zone_json': '{"zona1": [{"defect": "defect1", "count": 2, "confidence": 0.85}, {"defect": "defect2", "count": 1, "confidence": 0.82}], "zona2": [{"defect": "defect1", "count": 1, "confidence": 0.88}, {"defect": "defect3", "count": 1, "confidence": 0.90}]}'
+                }
+            ]
+        return []
+    finally:
+        try:
+            if 'conn' in locals():
+                conn.close()
+        except:
+            pass
+
+
+def get_analysis_by_id(analysis_id):
+    """
+    Obtiene un análisis por su ID
+    
+    Args:
+        analysis_id (int): ID del análisis a buscar
+        
+    Returns:
+        dict: Diccionario con los datos del análisis o None si no se encuentra
+    """
+    try:
+        if not DB_AVAILABLE:
+            # Datos de ejemplo si la base de datos no está disponible
+            if analysis_id == 1:
+                return {
+                    'id': 1,
+                    'timestamp': '2023-11-01 10:30:00',
+                    'user_name': 'admin',
+                    'analysis_type': 'qc_recepcion',
+                    'profile': 'perfil1',
+                    'distribucion': 'roja',
+                    'guia_sii': 'G12345',
+                    'lote': 'L001',
+                    'num_frutos': 100,
+                    'total_detections': 5,
+                    'zones_analyzed': 4,
+                    'confidence_used': 0.8,
+                    'results_json': '{"zona1": {"defect1": 2, "defect2": 1}, "zona2": {"defect1": 1, "defect3": 1}}',
+                    'detections_by_zone_json': '{"zona1": [{"defect": "defect1", "count": 2, "confidence": 0.85}, {"defect": "defect2", "count": 1, "confidence": 0.82}], "zona2": [{"defect": "defect1", "count": 1, "confidence": 0.88}, {"defect": "defect3", "count": 1, "confidence": 0.90}]}',
+                    'original_image_path': '/static/original_1.jpg',
+                    'processed_image_path': '/static/processed_1.jpg'
+                }
+            return None
+            
+        # Usar SQLAlchemy para obtener el análisis
+        session = SessionLocal()
+        analysis = session.query(AnalysisResult).filter(AnalysisResult.id == analysis_id).first()
+        
+        if not analysis:
+            return None
+            
+        # Convertir el objeto SQLAlchemy a diccionario
+        result = {}
+        for column in AnalysisResult.__table__.columns:
+            value = getattr(analysis, column.name)
+            # Convertir fechas a string
+            if isinstance(value, datetime):
+                value = value.strftime('%Y-%m-%d %H:%M:%S')
+            result[column.name] = value
+            
+        return result
+        
+    except Exception as e:
+        print(f"Error en get_analysis_by_id: {e}")
+        return None
+    finally:
+        if 'session' in locals():
+            session.close()
 
 # Inicializar base de datos al importar
 if __name__ == "__main__":

@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-gradient-to-br from-blue-50 via-sky-50 to-white">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportes | Ranco QC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet"/>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 18px 45px rgba(2, 6, 23, 0.10);
+        }
+        .input-focus:focus {
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+            border-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="h-full">
+    <div class="min-h-full flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
+        <div class="w-full max-w-7xl">
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center justify-center h-16 w-16 rounded-2xl bg-blue-100 ring-8 ring-blue-50">
+                        <i class="fas fa-chart-bar text-3xl text-blue-700"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900">Reportes y Análisis</h1>
+                        <p class="text-gray-600">Visualiza y exporta informes de análisis de calidad</p>
+                    </div>
+                </div>
+                <a href="/dashboard" class="inline-flex items-center gap-2 text-blue-700 hover:text-blue-800 hover:underline font-medium">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver al dashboard
+                </a>
+            </div>
+
+            <!-- Filtros -->
+            <div class="glass rounded-2xl p-6 mb-8">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Filtros</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Análisis</label>
+                        <select id="filterType" class="input-focus w-full rounded-xl border border-gray-300 px-4 py-2 focus:outline-none focus:ring-0">
+                            <option value="">Todos</option>
+                            <option value="qc_recepcion">QC Recepción</option>
+                            <option value="packing_qc">Packing QC</option>
+                            <option value="contramuestra">Contramuestra</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Distribución</label>
+                        <select id="filterDistribucion" class="input-focus w-full rounded-xl border border-gray-300 px-4 py-2 focus:outline-none focus:ring-0">
+                            <option value="">Todas</option>
+                            <option value="roja">Roja</option>
+                            <option value="bicolor">Bicolor</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio</label>
+                        <input type="date" id="filterStartDate" class="input-focus w-full rounded-xl border border-gray-300 px-4 py-2 focus:outline-none focus:ring-0">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Fin</label>
+                        <input type="date" id="filterEndDate" class="input-focus w-full rounded-xl border border-gray-300 px-4 py-2 focus:outline-none focus:ring-0">
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button id="resetFilters" class="px-4 py-2 rounded-xl bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">
+                        Limpiar
+                    </button>
+                    <button id="applyFilters" class="px-4 py-2 rounded-xl bg-blue-700 text-white hover:bg-blue-800">
+                        <i class="fas fa-filter mr-2"></i>Filtrar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Resumen -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Total Análisis</p>
+                            <p id="totalAnalisis" class="text-3xl font-bold text-gray-900">0</p>
+                        </div>
+                        <div class="p-3 rounded-full bg-blue-100 text-blue-700">
+                            <i class="fas fa-chart-pie text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Frutos Analizados</p>
+                            <p id="totalFrutos" class="text-3xl font-bold text-gray-900">0</p>
+                        </div>
+                        <div class="p-3 rounded-full bg-green-100 text-green-700">
+                            <i class="fas fa-apple-alt text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Defectos Detectados</p>
+                            <p id="totalDefectos" class="text-3xl font-bold text-gray-900">0</p>
+                        </div>
+                        <div class="p-3 rounded-full bg-red-100 text-red-700">
+                            <i class="fas fa-exclamation-triangle text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Tasa de Defectos</p>
+                            <p id="tasaDefectos" class="text-3xl font-bold text-gray-900">0%</p>
+                        </div>
+                        <div class="p-3 rounded-full bg-yellow-100 text-yellow-700">
+                            <i class="fas fa-percentage text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráficos -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <div class="glass rounded-2xl p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Distribución por Tipo de Análisis</h3>
+                    <div class="h-64">
+                        <canvas id="chartTipoAnalisis"></canvas>
+                    </div>
+                </div>
+                <div class="glass rounded-2xl p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Tendencia de Defectos</h3>
+                    <div class="h-64">
+                        <canvas id="chartTendencia"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Resultados -->
+            <div class="glass rounded-2xl p-6 mb-8">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Resultados</h2>
+                    <div class="flex gap-2">
+                        <button id="exportCSV" class="px-4 py-2 rounded-xl bg-white border border-green-600 text-green-700 hover:bg-green-50 flex items-center gap-2">
+                            <i class="fas fa-file-csv"></i> Exportar CSV
+                        </button>
+                        <button id="exportPDF" class="px-4 py-2 rounded-xl bg-white border border-red-600 text-red-700 hover:bg-red-50 flex items-center gap-2">
+                            <i class="fas fa-file-pdf"></i> Exportar PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Guía SII</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lote</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frutos</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Defectos</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% Defectos</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTable" class="bg-white divide-y divide-gray-200">
+                            <!-- Los resultados se cargarán aquí dinámicamente -->
+                            <tr>
+                                <td colspan="8" class="px-6 py-4 text-center text-gray-500">Cargando datos...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 flex items-center justify-between">
+                    <div class="text-sm text-gray-500">
+                        Mostrando <span id="showingFrom">0</span> a <span id="showingTo">0</span> de <span id="totalResults">0</span> resultados
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="prevPage" class="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50" disabled>Anterior</button>
+                        <div class="flex items-center">
+                            <span id="currentPage">1</span> / <span id="totalPages">1</span>
+                        </div>
+                        <button id="nextPage" class="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50" disabled>Siguiente</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalle -->
+    <div id="detailModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-900">Detalle del Análisis</h3>
+                    <button id="closeModal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                <div id="modalContent" class="space-y-4">
+                    <!-- El contenido se cargará aquí dinámicamente -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let currentPage = 1;
+        const itemsPerPage = 10;
+        let allResults = [];
+        let filteredResults = [];
+        let tipoAnalisisChart = null;
+        let tendenciaChart = null;
+
+        // Elementos del DOM
+        const resultsTable = document.getElementById('resultsTable');
+        const totalAnalisisEl = document.getElementById('totalAnalisis');
+        const totalFrutosEl = document.getElementById('totalFrutos');
+        const totalDefectosEl = document.getElementById('totalDefectos');
+        const tasaDefectosEl = document.getElementById('tasaDefectos');
+        const showingFromEl = document.getElementById('showingFrom');
+        const showingToEl = document.getElementById('showingTo');
+        const totalResultsEl = document.getElementById('totalResults');
+        const currentPageEl = document.getElementById('currentPage');
+        const totalPagesEl = document.getElementById('totalPages');
+        const prevPageBtn = document.getElementById('prevPage');
+        const nextPageBtn = document.getElementById('nextPage');
+        const applyFiltersBtn = document.getElementById('applyFilters');
+        const resetFiltersBtn = document.getElementById('resetFilters');
+        const exportCSVBtn = document.getElementById('exportCSV');
+        const exportPDFBtn = document.getElementById('exportPDF');
+        const detailModal = document.getElementById('detailModal');
+        const closeModalBtn = document.getElementById('closeModal');
+        const modalContent = document.getElementById('modalContent');
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            // Cargar datos iniciales
+            fetchReportsData();
+
+            // Configurar eventos
+            applyFiltersBtn.addEventListener('click', applyFilters);
+            resetFiltersBtn.addEventListener('click', resetFilters);
+            prevPageBtn.addEventListener('click', () => changePage(-1));
+            nextPageBtn.addEventListener('click', () => changePage(1));
+            closeModalBtn.addEventListener('click', () => {
+                detailModal.classList.add('hidden');
+                detailModal.classList.remove('flex');
+            });
+            exportCSVBtn.addEventListener('click', exportToCSV);
+            exportPDFBtn.addEventListener('click', exportToPDF);
+
+            // Configurar fecha por defecto (últimos 30 días)
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - 30);
+            
+            document.getElementById('filterStartDate').valueAsDate = startDate;
+            document.getElementById('filterEndDate').valueAsDate = endDate;
+        });
+
+        // Función para cargar los datos
+        async function fetchReportsData() {
+            try {
+                showLoading(true);
+                const response = await fetch('/api/reports/data');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    allResults = data.results || [];
+                    applyFilters();
+                    updateCharts();
+                } else {
+                    showError('Error al cargar los datos: ' + (data.error || 'Error desconocido'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error de conexión con el servidor');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Aplicar filtros
+        function applyFilters() {
+            const typeFilter = document.getElementById('filterType').value;
+            const distribucionFilter = document.getElementById('filterDistribucion').value;
+            const startDate = document.getElementById('filterStartDate').value;
+            const endDate = document.getElementById('filterEndDate').value;
+
+            filteredResults = allResults.filter(item => {
+                const itemDate = new Date(item.timestamp);
+                const start = startDate ? new Date(startDate) : null;
+                const end = endDate ? new Date(endDate + 'T23:59:59') : null;
+                
+                return (!typeFilter || item.analysis_type === typeFilter) &&
+                       (!distribucionFilter || item.distribucion === distribucionFilter) &&
+                       (!start || itemDate >= start) &&
+                       (!end || itemDate <= end);
+            });
+
+            currentPage = 1;
+            updateTable();
+            updateSummary();
+        }
+
+        // Reiniciar filtros
+        function resetFilters() {
+            document.getElementById('filterType').value = '';
+            document.getElementById('filterDistribucion').value = '';
+            document.getElementById('filterStartDate').value = '';
+            document.getElementById('filterEndDate').value = '';
+            
+            // Resetear a los últimos 30 días
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - 30);
+            
+            document.getElementById('filterStartDate').valueAsDate = startDate;
+            document.getElementById('filterEndDate').valueAsDate = endDate;
+            
+            applyFilters();
+        }
+
+        // Actualizar tabla con los resultados filtrados
+        function updateTable() {
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedResults = filteredResults.slice(startIndex, endIndex);
+
+            // Actualizar controles de paginación
+            const totalPages = Math.ceil(filteredResults.length / itemsPerPage);
+            totalPagesEl.textContent = totalPages;
+            currentPageEl.textContent = currentPage;
+            prevPageBtn.disabled = currentPage === 1;
+            nextPageBtn.disabled = currentPage >= totalPages;
+            
+            showingFromEl.textContent = filteredResults.length > 0 ? startIndex + 1 : 0;
+            showingToEl.textContent = Math.min(endIndex, filteredResults.length);
+            totalResultsEl.textContent = filteredResults.length;
+
+            // Actualizar tabla
+            if (paginatedResults.length === 0) {
+                resultsTable.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="px-6 py-4 text-center text-gray-500">No se encontraron resultados con los filtros actuales</td>
+                    </tr>`;
+                return;
+            }
+
+            resultsTable.innerHTML = paginatedResults.map(item => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${formatDate(item.timestamp)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            ${getTypeBadgeClass(item.analysis_type)}">
+                            ${formatAnalysisType(item.analysis_type)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${item.guia_sii || 'N/A'}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${item.lote || 'N/A'}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${item.num_frutos || 0}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${item.total_detections || 0}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        ${calculateDefectRate(item)}%
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="showDetail('${item.id}')" class="text-blue-600 hover:text-blue-900 mr-3">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <a href="/analyze?id=${item.id}" class="text-green-600 hover:text-green-900">
+                            <i class="fas fa-redo"></i>
+                        </a>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Actualizar resumen
+        function updateSummary() {
+            totalAnalisisEl.textContent = filteredResults.length;
+            
+            const totalFrutos = filteredResults.reduce((sum, item) => sum + (parseInt(item.num_frutos) || 0), 0);
+            totalFrutosEl.textContent = totalFrutos.toLocaleString();
+            
+            const totalDefectos = filteredResults.reduce((sum, item) => sum + (parseInt(item.total_detections) || 0), 0);
+            totalDefectosEl.textContent = totalDefectos.toLocaleString();
+            
+            const tasaDefectos = totalFrutos > 0 ? (totalDefectos / totalFrutos * 100).toFixed(2) : 0;
+            tasaDefectosEl.textContent = `${tasaDefectos}%`;
+        }
+
+        // Actualizar gráficos
+        function updateCharts() {
+            // Destruir gráficos existentes
+            if (tipoAnalisisChart) {
+                tipoAnalisisChart.destroy();
+            }
+            if (tendenciaChart) {
+                tendenciaChart.destroy();
+            }
+
+            // Gráfico de tipo de análisis
+            const tipoAnalisisCtx = document.getElementById('chartTipoAnalisis').getContext('2d');
+            const tiposData = getDataByType();
+            
+            tipoAnalisisChart = new Chart(tipoAnalisisCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: tiposData.labels,
+                    datasets: [{
+                        data: tiposData.data,
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+
+            // Gráfico de tendencia
+            const tendenciaCtx = document.getElementById('chartTendencia').getContext('2d');
+            const tendenciaData = getTendencyData();
+            
+            tendenciaChart = new Chart(tendenciaCtx, {
+                type: 'line',
+                data: {
+                    labels: tendenciaData.labels,
+                    datasets: [{
+                        label: 'Tasa de defectos (%)',
+                        data: tendenciaData.rates,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Tasa: ${context.parsed.y.toFixed(2)}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Obtener datos por tipo de análisis
+        function getDataByType() {
+            const counts = {
+                'qc_recepcion': 0,
+                'packing_qc': 0,
+                'contramuestra': 0
+            };
+
+            filteredResults.forEach(item => {
+                if (counts.hasOwnProperty(item.analysis_type)) {
+                    counts[item.analysis_type]++;
+                }
+            });
+
+            return {
+                labels: ['QC Recepción', 'Packing QC', 'Contramuestra'],
+                data: [counts.qc_recepcion, counts.packing_qc, counts.contramuestra]
+            };
+        }
+
+        // Obtener datos de tendencia (últimos 7 días)
+        function getTendencyData() {
+            const dates = [];
+            const rates = [];
+            
+            // Últimos 7 días
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                dates.push(formatDateShort(date));
+                
+                // Filtrar resultados por fecha
+                const dayStart = new Date(date);
+                dayStart.setHours(0, 0, 0, 0);
+                const dayEnd = new Date(date);
+                dayEnd.setHours(23, 59, 59, 999);
+                
+                const dayResults = filteredResults.filter(item => {
+                    const itemDate = new Date(item.timestamp);
+                    return itemDate >= dayStart && itemDate <= dayEnd;
+                });
+                
+                // Calcular tasa de defectos para el día
+                const totalFrutos = dayResults.reduce((sum, item) => sum + (parseInt(item.num_frutos) || 0), 0);
+                const totalDefectos = dayResults.reduce((sum, item) => sum + (parseInt(item.total_detections) || 0), 0);
+                const tasa = totalFrutos > 0 ? (totalDefectos / totalFrutos * 100) : 0;
+                
+                rates.push(tasa);
+            }
+            
+            return {
+                labels: dates,
+                rates: rates
+            };
+        }
+
+        // Mostrar detalle de un análisis
+        async function showDetail(analysisId) {
+            try {
+                const response = await fetch(`/api/reports/detail/${analysisId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAnalysisDetail(data);
+                } else {
+                    alert('Error al cargar el detalle: ' + (data.error || 'Error desconocido'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error de conexión con el servidor');
+            }
+        }
+
+        // Mostrar el modal con el detalle del análisis
+        function showAnalysisDetail(data) {
+            // Formatear la fecha
+            const date = new Date(data.timestamp);
+            const formattedDate = date.toLocaleString('es-CL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            // Calcular tasas
+            const totalFrutos = parseInt(data.num_frutos) || 0;
+            const totalDefectos = parseInt(data.total_detections) || 0;
+            const tasaDefectos = totalFrutos > 0 ? (totalDefectos / totalFrutos * 100).toFixed(2) : 0;
+
+            // Construir el HTML del detalle
+            let detailHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-blue-800 mb-2">Información General</h4>
+                            <div class="space-y-2">
+                                <p><span class="font-medium">Fecha:</span> ${formattedDate}</p>
+                                <p><span class="font-medium">Tipo:</span> ${formatAnalysisType(data.analysis_type)}</p>
+                                <p><span class="font-medium">Distribución:</span> ${formatDistribucion(data.distribucion)}</p>
+                                <p><span class="font-medium">Guía SII:</span> ${data.guia_sii || 'N/A'}</p>
+                                <p><span class="font-medium">Lote:</span> ${data.lote || 'N/A'}</p>
+                                ${data.num_proceso ? `<p><span class="font-medium">N° Proceso:</span> ${data.num_proceso}</p>` : ''}
+                                ${data.id_caja ? `<p><span class="font-medium">ID Caja:</span> ${data.id_caja}</p>` : ''}
+                            </div>
+                        </div>
+                        
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-green-800 mb-2">Resumen del Análisis</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="text-center p-3 bg-white rounded-lg">
+                                    <p class="text-2xl font-bold text-green-700">${totalFrutos}</p>
+                                    <p class="text-sm text-gray-600">Frutos Analizados</p>
+                                </div>
+                                <div class="text-center p-3 bg-white rounded-lg">
+                                    <p class="text-2xl font-bold text-red-700">${totalDefectos}</p>
+                                    <p class="text-sm text-gray-600">Defectos Detectados</p>
+                                </div>
+                                <div class="text-center p-3 bg-white rounded-lg col-span-2">
+                                    <p class="text-2xl font-bold text-blue-700">${tasaDefectos}%</p>
+                                    <p class="text-sm text-gray-600">Tasa de Defectos</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-3">Distribución de Defectos</h4>
+                            <div class="h-48">
+                                <canvas id="detailDefectsChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-3">Imagen del Análisis</h4>
+                            ${data.processed_image_path 
+                                ? `<img src="${data.processed_image_path}" alt="Análisis de cerezas" class="w-full h-auto rounded-lg border border-gray-200">`
+                                : '<p class="text-gray-500 italic">No hay imagen disponible</p>'}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-gray-800 mb-3">Detalle por Zona</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Zona</th>
+                                    <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Frutos</th>
+                                    <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Defectos</th>
+                                    <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">% Defectos</th>
+                                </tr>
+                            </thead>
+                            <tbody id="zonesTableBody" class="divide-y divide-gray-200">
+                                ${formatZonesData(data.results_json || '{}')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            // Actualizar el contenido del modal
+            modalContent.innerHTML = detailHTML;
+            
+            // Mostrar el modal
+            detailModal.classList.remove('hidden');
+            detailModal.classList.add('flex');
+            
+            // Inicializar el gráfico de defectos
+            initDefectsChart(data);
+        }
+
+        // Formatear datos de zonas para la tabla
+        function formatZonesData(zonesJson) {
+            try {
+                const zones = typeof zonesJson === 'string' ? JSON.parse(zonesJson) : zonesJson;
+                if (!zones) return '';
+                
+                return Object.entries(zones).map(([zone, data]) => {
+                    const frutos = parseInt(data.total || 0);
+                    const defectos = Object.values(data.defects || {}).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
+                    const tasa = frutos > 0 ? ((defectos / frutos) * 100).toFixed(2) : 0;
+                    
+                    return `
+                        <tr>
+                            <td class="px-4 py-2 text-sm text-gray-800">${zone}</td>
+                            <td class="px-4 py-2 text-sm text-center text-gray-600">${frutos}</td>
+                            <td class="px-4 py-2 text-sm text-center text-gray-600">${defectos}</td>
+                            <td class="px-4 py-2 text-sm text-center font-medium">${tasa}%</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Error al formatear zonas:', e);
+                return '<tr><td colspan="4" class="px-4 py-2 text-sm text-gray-500 text-center">No hay datos de zonas disponibles</td></tr>';
+            }
+        }
+
+        // Inicializar gráfico de defectos en el modal
+        function initDefectsChart(data) {
+            try {
+                const ctx = document.getElementById('detailDefectsChart').getContext('2d');
+                const zones = typeof data.results_json === 'string' ? JSON.parse(data.results_json) : data.results_json || {};
+                
+                // Contar defectos por tipo
+                const defectCounts = {};
+                Object.values(zones).forEach(zone => {
+                    if (zone.defects) {
+                        Object.entries(zone.defects).forEach(([defect, count]) => {
+                            defectCounts[defect] = (defectCounts[defect] || 0) + parseInt(count);
+                        });
+                    }
+                });
+                
+                // Ordenar por cantidad (mayor a menor) y tomar los 5 principales
+                const sortedDefects = Object.entries(defectCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5);
+                
+                const labels = sortedDefects.map(([defect]) => formatDefectName(defect));
+                const counts = sortedDefects.map(([_, count]) => count);
+                
+                // Colores para las barras
+                const backgroundColors = [
+                    'rgba(59, 130, 246, 0.8)',
+                    'rgba(16, 185, 129, 0.8)',
+                    'rgba(245, 158, 11, 0.8)',
+                    'rgba(236, 72, 153, 0.8)',
+                    'rgba(139, 92, 246, 0.8)'
+                ];
+                
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Defectos',
+                            data: counts,
+                            backgroundColor: backgroundColors,
+                            borderColor: backgroundColors.map(c => c.replace('0.8', '1')),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+                
+            } catch (e) {
+                console.error('Error al inicializar gráfico de defectos:', e);
+            }
+        }
+
+        // Exportar a CSV
+        function exportToCSV() {
+            if (filteredResults.length === 0) {
+                alert('No hay datos para exportar');
+                return;
+            }
+            
+            // Crear encabezados
+            const headers = [
+                'Fecha', 'Tipo', 'Distribución', 'Guía SII', 'Lote', 'N° Proceso', 'ID Caja',
+                'Frutos Analizados', 'Defectos Detectados', 'Tasa de Defectos (%)'
+            ];
+            
+            // Crear filas de datos
+            const rows = filteredResults.map(item => {
+                const date = new Date(item.timestamp);
+                const formattedDate = date.toLocaleString('es-CL');
+                const tasaDefectos = calculateDefectRate(item);
+                
+                return [
+                    `"${formattedDate}"`,
+                    `"${formatAnalysisType(item.analysis_type)}"`,
+                    `"${formatDistribucion(item.distribucion)}"`,
+                    `"${item.guia_sii || ''}"`,
+                    `"${item.lote || ''}"`,
+                    `"${item.num_proceso || ''}"`,
+                    `"${item.id_caja || ''}"`,
+                    item.num_frutos || 0,
+                    item.total_detections || 0,
+                    tasaDefectos
+                ].join(',');
+            });
+            
+            // Combinar todo
+            const csvContent = [
+                headers.join(','),
+                ...rows
+            ].join('\n');
+            
+            // Crear y descargar archivo
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `reporte_analisis_${formatDateForFilename(new Date())}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Exportar a PDF (solicita al servidor)
+        function exportToPDF() {
+            if (filteredResults.length === 0) {
+                alert('No hay datos para exportar');
+                return;
+            }
+            
+            // Obtener filtros actuales
+            const filters = {
+                type: document.getElementById('filterType').value,
+                distribucion: document.getElementById('filterDistribucion').value,
+                startDate: document.getElementById('filterStartDate').value,
+                endDate: document.getElementById('filterEndDate').value
+            };
+            
+            // Construir URL con parámetros
+            const params = new URLSearchParams();
+            if (filters.type) params.append('type', filters.type);
+            if (filters.distribucion) params.append('distribucion', filters.distribucion);
+            if (filters.startDate) params.append('start_date', filters.startDate);
+            if (filters.endDate) params.append('end_date', filters.endDate);
+            
+            // Abrir en nueva pestaña para descargar el PDF
+            window.open(`/api/reports/export/pdf?${params.toString()}`, '_blank');
+        }
+
+        // Cambiar de página
+        function changePage(delta) {
+            const newPage = currentPage + delta;
+            const totalPages = Math.ceil(filteredResults.length / itemsPerPage);
+            
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                updateTable();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // Mostrar/ocultar carga
+        function showLoading(show) {
+            const loadingEl = document.createElement('div');
+            loadingEl.id = 'loadingOverlay';
+            loadingEl.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            loadingEl.innerHTML = `
+                <div class="bg-white p-6 rounded-xl shadow-xl flex items-center space-x-4">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
+                    <span class="text-gray-700">Cargando datos...</span>
+                </div>
+            `;
+            
+            if (show) {
+                document.body.appendChild(loadingEl);
+            } else {
+                const existing = document.getElementById('loadingOverlay');
+                if (existing) {
+                    existing.remove();
+                }
+            }
+        }
+
+        // Mostrar error
+        function showError(message) {
+            const errorEl = document.createElement('div');
+            errorEl.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50';
+            errorEl.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-red-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(errorEl);
+            
+            // Eliminar después de 5 segundos
+            setTimeout(() => {
+                if (errorEl.parentNode) {
+                    errorEl.remove();
+                }
+            }, 5000);
+        }
+
+        // Funciones de utilidad
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('es-CL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatDateShort(date) {
+            return date.toLocaleDateString('es-CL', {
+                day: '2-digit',
+                month: '2-digit'
+            });
+        }
+
+        function formatDateForFilename(date) {
+            const pad = num => num.toString().padStart(2, '0');
+            return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}`;
+        }
+
+        function formatAnalysisType(type) {
+            const types = {
+                'qc_recepcion': 'QC Recepción',
+                'packing_qc': 'Packing QC',
+                'contramuestra': 'Contramuestra'
+            };
+            return types[type] || type;
+        }
+
+        function formatDistribucion(dist) {
+            const dists = {
+                'roja': 'Roja',
+                'bicolor': 'Bicolor'
+            };
+            return dists[dist] || dist || 'N/A';
+        }
+
+        function formatDefectName(defect) {
+            // Formatear nombres de defectos para mostrarlos mejor
+            return defect
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function getTypeBadgeClass(type) {
+            const classes = {
+                'qc_recepcion': 'bg-blue-100 text-blue-800',
+                'packing_qc': 'bg-green-100 text-green-800',
+                'contramuestra': 'bg-yellow-100 text-yellow-800'
+            };
+            return classes[type] || 'bg-gray-100 text-gray-800';
+        }
+
+        function calculateDefectRate(item) {
+            const frutos = parseInt(item.num_frutos) || 0;
+            const defectos = parseInt(item.total_detections) || 0;
+            return frutos > 0 ? ((defectos / frutos) * 100).toFixed(2) : 0;
+        }
+
+        // Hacer funciones accesibles globalmente para los eventos en línea
+        window.showDetail = showDetail;
+    </script>
+</body>
+</html>

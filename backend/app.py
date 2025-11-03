@@ -17,9 +17,13 @@ from database import (
     create_tables, test_db_connection, save_analysis_result, 
     get_analysis_history, sync_pending_data, save_to_local_cache,
     get_local_history, DB_AVAILABLE, create_admin_user, authenticate_user,
-    create_user, get_all_users, delete_user, update_user_role, get_defects_for_profile
-)
-from flask import session
+    create_user, get_all_users, delete_user, update_user_role, get_defects_for_profile,
+    get_analysis_by_id, get_analysis_results, is_sqlite
+)  
+from flask import session, send_file, make_response
+import io
+import csv
+from datetime import datetime, timedelta
 
 # Cargar variables de entorno
 load_dotenv()
@@ -576,6 +580,10 @@ def history():
 def crear_usuario_pantalla():
     return send_from_directory('../frontend/src/components', 'crear_usuario.html')
 
+@app.route('/reports')
+def reports_page():
+    return send_from_directory('../frontend/src/components', 'reports.html')
+    
 @app.route('/<page>.html')
 def redirect_html(page):
     """Redirige rutas con .html a su equivalente sin extensión"""
@@ -1707,14 +1715,226 @@ def api_update_user_role(user_id):
 def api_get_defects(profile):
     """Obtener defectos disponibles para un perfil"""
     try:
+        if not profile:
+            return jsonify({"error": "Se requiere el parámetro 'profile'"}), 400
+            
         defects = get_defects_for_profile(profile)
+        return jsonify({"defects": defects})
+        
+    except Exception as e:
+        print(f"Error al obtener defectos: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/reports/data', methods=['GET'])
+def get_reports_data():
+    try:
+        # Filtros
+        analysis_type = request.args.get('analysis_type')
+        distribution = request.args.get('distribution')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        page = max(page, 1)
+        per_page = max(per_page, 1)
+
+        # Placeholder según motor
+        placeholder = '?' if is_sqlite() else '%s'
+
+        base = " FROM analysis_results"
+        where = " WHERE 1=1"
+        params = []
+
+        if analysis_type and analysis_type != 'all':
+            where += f" AND analysis_type = {placeholder}"
+            params.append(analysis_type)
+
+        if distribution and distribution != 'all':
+            where += f" AND distribucion = {placeholder}"
+            params.append(distribution)
+
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                where += f" AND timestamp >= {placeholder}"
+                params.append(start_dt.strftime('%Y-%m-%d 00:00:00'))
+            except ValueError:
+                pass
+
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+                where += f" AND timestamp < {placeholder}"
+                params.append(end_dt.strftime('%Y-%m-%d 00:00:00'))
+            except ValueError:
+                pass
+
+        # Total
+        count_sql = "SELECT COUNT(*) AS total" + base + where
+        total_row = get_analysis_results(count_sql, params)
+        total = total_row[0]['total'] if total_row else 0
+
+        # Datos con paginación: LIMIT/OFFSET insertados como enteros (no placeholders)
+        offset = (page - 1) * per_page
+        data_sql = (
+            "SELECT id, timestamp, user_name, analysis_type, profile, distribucion, "
+            "guia_sii, lote, num_frutos, num_proceso, id_caja, total_detections, "
+            "zones_analyzed, confidence_used, processed_image_path, results_json "
+            + base + where + " ORDER BY timestamp DESC "
+            f"LIMIT {int(per_page)} OFFSET {int(offset)}"
+        )
+
+        rows = get_analysis_results(data_sql, params)
+
         return jsonify({
-            "success": True,
-            "profile": profile,
-            "defects": defects
+            "results": rows,  # el frontend espera 'results'
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total + per_page - 1) // per_page
         })
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        print(f"Error al obtener datos del informe: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/reports/detail/<int:analysis_id>', methods=['GET'])
+def get_analysis_detail(analysis_id):
+    """Obtener detalles de un análisis específico"""
+    try:
+        analysis = get_analysis_by_id(analysis_id)
+        if not analysis:
+            return jsonify({"error": "Análisis no encontrado"}), 404
+            
+        # Procesar resultados JSON
+        if 'results_json' in analysis and analysis['results_json']:
+            try:
+                analysis['results'] = json.loads(analysis['results_json'])
+            except:
+                analysis['results'] = {}
+        else:
+            analysis['results'] = {}
+            
+        # Procesar detecciones por zona
+        if 'detections_by_zone_json' in analysis and analysis['detections_by_zone_json']:
+            try:
+                analysis['detections_by_zone'] = json.loads(analysis['detections_by_zone_json'])
+            except:
+                analysis['detections_by_zone'] = {}
+        else:
+            analysis['detections_by_zone'] = {}
+            
+        # Eliminar campos JSON originales para evitar duplicación
+        analysis.pop('results_json', None)
+        analysis.pop('detections_by_zone_json', None)
+        
+        return jsonify(analysis)
+        
+    except Exception as e:
+        print(f"Error al obtener detalles del análisis: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/reports/export/csv', methods=['GET'])
+def export_reports_csv():
+    try:
+        analysis_type = request.args.get('analysis_type')
+        distribution = request.args.get('distribution')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
+        placeholder = '?' if is_sqlite() else '%s'
+        base = " FROM analysis_results"
+        where = " WHERE 1=1"
+        params = []
+
+        if analysis_type and analysis_type != 'all':
+            where += f" AND analysis_type = {placeholder}"
+            params.append(analysis_type)
+
+        if distribution and distribution != 'all':
+            where += f" AND distribucion = {placeholder}"
+            params.append(distribution)
+
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                where += f" AND timestamp >= {placeholder}"
+                params.append(start_dt.strftime('%Y-%m-%d 00:00:00'))
+            except ValueError:
+                pass
+
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+                where += f" AND timestamp < {placeholder}"
+                params.append(end_dt.strftime('%Y-%m-%d 00:00:00'))
+            except ValueError:
+                pass
+
+        query = "SELECT id, timestamp, user_name, analysis_type, profile, distribucion, guia_sii, lote, num_frutos, total_detections, zones_analyzed, confidence_used" + base + where + " ORDER BY timestamp DESC"
+        results = get_analysis_results(query, params)
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['ID','Fecha','Usuario','Tipo de Análisis','Perfil','Distribución','Guía SII','Lote','N° Frutos','Total Defectos','Zonas Analizadas','Confianza'])
+        for row in results:
+            writer.writerow([
+                row.get('id',''), row.get('timestamp',''), row.get('user_name',''),
+                row.get('analysis_type',''), row.get('profile',''), row.get('distribucion',''),
+                row.get('guia_sii',''), row.get('lote',''), row.get('num_frutos',''),
+                row.get('total_detections',''), row.get('zones_analyzed',''), row.get('confidence_used','')
+            ])
+        output.seek(0)
+        resp = make_response(output.getvalue())
+        resp.headers['Content-Disposition'] = 'attachment; filename=reporte_analisis.csv'
+        resp.headers['Content-type'] = 'text/csv; charset=utf-8'
+        return resp
+    except Exception as e:
+        print(f"Error al exportar informe CSV: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/reports/export/pdf', methods=['GET'])
+def export_reports_pdf():
+    """Exportar informe a PDF (implementación básica)"""
+    try:
+        # En una implementación real, aquí se generaría el PDF con los datos filtrados
+        # Por ahora, devolvemos un mensaje indicando que la función está en desarrollo
+        return jsonify({
+            "message": "La exportación a PDF está en desarrollo. Por ahora, use la exportación CSV.",
+            "status": "en_desarrollo"
+        })
+        
+        # Código de ejemplo para generación de PDF (descomentar cuando esté listo)
+        """
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
+        from io import BytesIO
+        
+        # Crear PDF en memoria
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        
+        # Añadir contenido al PDF
+        p.drawString(100, 750, "Informe de Análisis")
+        p.drawString(100, 730, f"Generado el: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # ... más contenido del PDF ...
+        
+        p.showPage()
+        p.save()
+        
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f'reporte_analisis_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
+            mimetype='application/pdf'
+        )
+        """
+        
+    except Exception as e:
+        print(f"Error al exportar informe PDF: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/manual_analysis', methods=['POST'])
 def manual_analysis():
