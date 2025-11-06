@@ -7,7 +7,7 @@ import argparse
 # ---- CONFIG: define la rejilla por bandeja ----
 # Notas: El flujo de bandejas (verde) ha sido deshabilitado. Solo se usarán zonas nombradas (naranjas).
 
-REF_IMAGE = "backend/static/capture_20251027_145847_rtsp_original.jpg"
+REF_IMAGE = "backend/static/capture_20251106_144414_rtsp_original.jpg"
 OUT_JSON  = "zonas.json"
 OUT_PREVIEW = "zones_preview.png"
 

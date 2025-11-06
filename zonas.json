@@ -1,6 +1,4 @@
 {
-  "profile": "QC Recepción - Fruta Bicolor",
-  "description": "Zonas específicas para análisis de fruta bicolor en recepción",
   "named_zones": [
     {
       "name": "GOLPE DE CALOR",
