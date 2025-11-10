@@ -437,6 +437,50 @@
                     <!-- Los defectos se cargarán dinámicamente según el perfil -->
                 </div>
                 
+                <!-- Botón para agregar nuevo defecto -->
+                <div class="add-new-defect-section" style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 6px; border: 1px dashed #6c757d;">
+                    <button class="btn btn-outline-primary" onclick="showNewDefectForm()" style="width: 100%;">
+                        <i class="fas fa-plus"></i> Agregar Nuevo Defecto
+                    </button>
+                </div>
+                
+                <!-- Formulario para nuevo defecto (oculto por defecto) -->
+                <div id="new-defect-form-manual" class="new-defect-form" style="display: none; margin-top: 15px; padding: 15px; background: #e7f3ff; border-radius: 6px; border: 1px solid #0066cc;">
+                    <h4 style="margin: 0 0 10px 0; color: #0066cc;">
+                        <i class="fas fa-plus-circle"></i> Crear Nuevo Defecto
+                    </h4>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="new-defect-name-manual">Nombre del defecto:</label>
+                        <input type="text" id="new-defect-name-manual" class="form-control" placeholder="Ej: Manchas oscuras, Grietas, etc." style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="new-defect-count-manual">Cantidad:</label>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <button type="button" onclick="updateNewDefectCount(-1)" class="btn btn-sm" style="padding: 5px 10px;">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <input type="number" id="new-defect-count-manual" class="form-control" min="0" value="1" style="width: 80px; text-align: center; padding: 5px;">
+                            <button type="button" onclick="updateNewDefectCount(1)" class="btn btn-sm" style="padding: 5px 10px;">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="persist-new-defect-manual" checked>
+                            <span style="margin-left: 6px; font-size: 12px;">Guardar este defecto en el perfil para futuros análisis</span>
+                        </label>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="cancelNewDefectForm()" style="flex: 1;">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                        <button class="btn btn-primary" onclick="addNewDefectToManual()" style="flex: 1;">
+                            <i class="fas fa-check"></i> Agregar
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="manual-totals">
                     <div class="total-defects">
                         <strong>Total de defectos: <span id="manual-total-defects">0</span></strong>

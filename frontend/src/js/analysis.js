@@ -863,13 +863,29 @@ function newAnalysis() {
         selectedImage = null;
         analysisResults = null;
         
-        // Resetear formulario
-        document.querySelector('.form-section')?.reset();
+        // Resetear campos del formulario manualmente
+        const profileSelect = document.getElementById('profile-select');
+        const distribucionSelect = document.getElementById('distribucion');
+        const guiaSiiInput = document.getElementById('guia-sii');
+        const loteInput = document.getElementById('lote');
+        const numFrutosInput = document.getElementById('num-frutos');
+        const numProcesoInput = document.getElementById('num-proceso');
+        const idCajaInput = document.getElementById('id-caja');
+        
+        // Resetear valores
+        if (profileSelect) profileSelect.value = '';
+        if (distribucionSelect) distribucionSelect.value = '';
+        if (guiaSiiInput) guiaSiiInput.value = '';
+        if (loteInput) loteInput.value = '';
+        if (numFrutosInput) numFrutosInput.value = '';
+        if (numProcesoInput) numProcesoInput.value = '';
+        if (idCajaInput) idCajaInput.value = '';
         
         // Resetear vista previa
         const captureArea = document.getElementById('capture-area');
         const cameraPreview = document.getElementById('camera-preview');
         const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
         
         if (captureArea && cameraPreview && imagePreviewContainer) {
             captureArea.classList.remove('has-image');
@@ -877,13 +893,26 @@ function newAnalysis() {
             imagePreviewContainer.style.display = 'none';
         }
         
+        // Limpiar la imagen de vista previa
+        if (imagePreview) {
+            imagePreview.src = '';
+        }
+        
+        // Resetear títulos y perfil actual
+        currentProfile = 'qc_recepcion';
+        
         // Mostrar formulario
         showSection('form-section');
         hideSection('results-section');
         hideSection('success-message');
         
         // Validar formulario
-        validateForm();
+        setTimeout(() => {
+            validateForm();
+        }, 100);
+        
+        // Notificación de confirmación
+        showNotification('Formulario limpiado. Puedes iniciar un nuevo análisis.', 'success');
     }
 }
 
@@ -2284,4 +2313,117 @@ window.closeManualEntry = closeManualEntry;
 window.submitManualEntry = submitManualEntry;
 window.adjustManualDefectCount = adjustManualDefectCount;
 window.setManualDefectCount = setManualDefectCount;
-window.addManualDefect = addManualDefect;2
+window.addManualDefect = addManualDefect;
+
+// ===== FUNCIONES PARA NUEVO DEFECTO EN MODAL MANUAL =====
+
+// Mostrar formulario de nuevo defecto
+function showNewDefectForm() {
+    const form = document.getElementById('new-defect-form-manual');
+    if (form) {
+        form.style.display = 'block';
+        const input = document.getElementById('new-defect-name-manual');
+        if (input) {
+            input.focus();
+        }
+    }
+}
+
+// Cancelar formulario de nuevo defecto
+function cancelNewDefectForm() {
+    const form = document.getElementById('new-defect-form-manual');
+    if (form) {
+        form.style.display = 'none';
+        // Limpiar campos
+        const nameInput = document.getElementById('new-defect-name-manual');
+        const countInput = document.getElementById('new-defect-count-manual');
+        const persistCheckbox = document.getElementById('persist-new-defect-manual');
+        
+        if (nameInput) nameInput.value = '';
+        if (countInput) countInput.value = '1';
+        if (persistCheckbox) persistCheckbox.checked = true;
+    }
+}
+
+// Actualizar contador del nuevo defecto (+/-)
+function updateNewDefectCount(change) {
+    const countInput = document.getElementById('new-defect-count-manual');
+    if (!countInput) return;
+    
+    const currentValue = parseInt(countInput.value) || 1;
+    const newValue = Math.max(0, currentValue + change);
+    countInput.value = newValue;
+}
+
+// Agregar nuevo defecto al listado manual
+async function addNewDefectToManual() {
+    try {
+        const nameInput = document.getElementById('new-defect-name-manual');
+        const countInput = document.getElementById('new-defect-count-manual');
+        const persistCheckbox = document.getElementById('persist-new-defect-manual');
+        
+        if (!nameInput || !countInput) {
+            showNotification('Error: elementos del formulario no encontrados', 'error');
+            return;
+        }
+        
+        const defectName = nameInput.value.trim();
+        const count = parseInt(countInput.value) || 1;
+        
+        // Validaciones
+        if (!defectName) {
+            showNotification('Debe ingresar el nombre del defecto', 'error');
+            nameInput.focus();
+            return;
+        }
+        
+        if (count < 1) {
+            showNotification('La cantidad debe ser mayor a 0', 'error');
+            countInput.focus();
+            return;
+        }
+        
+        // Verificar que no exista ya en la lista
+        if (availableDefects.includes(defectName) || manualDefects.hasOwnProperty(defectName)) {
+            showNotification('Este defecto ya existe en la lista', 'error');
+            nameInput.focus();
+            return;
+        }
+        
+        // Agregar a la lista de defectos disponibles
+        availableDefects.push(defectName);
+        
+        // Agregar a la lista de defectos manuales con el contador
+        manualDefects[defectName] = count;
+        
+        // Persistir en el perfil si está marcado
+        if (persistCheckbox && persistCheckbox.checked) {
+            try {
+                await persistDefectInProfile(defectName, currentProfile);
+                showNotification(`Nuevo defecto "${defectName}" guardado en el perfil`, 'success');
+            } catch (error) {
+                console.warn('No se pudo persistir el defecto:', error);
+                showNotification('El defecto se agregó pero no se guardó permanentemente en el perfil', 'warning');
+            }
+        }
+        
+        // Actualizar la interfaz
+        displayManualDefectsList();
+        updateManualTotal();
+        
+        // Ocultar el formulario
+        cancelNewDefectForm();
+        
+        showNotification(`Nuevo defecto "${defectName}" agregado con cantidad: ${count}`, 'success');
+        
+    } catch (error) {
+        console.error('Error agregando nuevo defecto:', error);
+        showNotification('Error al agregar nuevo defecto: ' + error.message, 'error');
+    }
+}
+
+// Hacer funciones globales para uso en HTML
+window.showNewDefectForm = showNewDefectForm;
+window.cancelNewDefectForm = cancelNewDefectForm;
+window.updateNewDefectCount = updateNewDefectCount;
+window.addNewDefectToManual = addNewDefectToManual;
