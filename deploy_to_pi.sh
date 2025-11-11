@@ -43,4 +43,3 @@ echo ""
 echo "Para ver los logs en tiempo real:"
 echo "  ssh ${PI_USER}@${PI_HOST} 'tail -f /tmp/flask.log'"
 echo ""
-
